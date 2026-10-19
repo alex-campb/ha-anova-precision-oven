@@ -1,8 +1,10 @@
 """Camera platform for Anova Precision Oven (v2, snapshots via the app login).
 
 The oven only streams while cooking. A snapshot starts the oven's live
-stream over the app login, grabs one frame from its SRT feed with ffmpeg,
-and the stream is stopped again once snapshots stop being requested.
+stream over the app login and grabs one frame from its SRT feed with
+ffmpeg in the background; the stream is stopped again once snapshots stop
+being requested. Home Assistant gives a snapshot about 10 seconds, so a
+request waits a bounded time and otherwise returns the latest frame.
 """
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 from homeassistant.components.camera import Camera
-from homeassistant.components.ffmpeg import async_get_image
+from homeassistant.components.ffmpeg import get_ffmpeg_manager
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
@@ -33,6 +35,10 @@ STREAM_KEEPALIVE_SECONDS = 50
 STREAM_IDLE_STOP_SECONDS = 60
 # The oven's publisher needs a moment after a fresh start
 STREAM_WARMUP_SECONDS = 3
+# How long one ffmpeg frame grab may take
+FRAME_GRAB_TIMEOUT_SECONDS = 25
+# How long a snapshot request waits for a grab before returning the last frame
+SNAPSHOT_WAIT_SECONDS = 8
 
 
 async def async_setup_entry(
@@ -81,7 +87,7 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         self._attr_unique_id = f"{device_id}_camera"
         self._attr_name = "Camera"
 
-        self._lock = asyncio.Lock()
+        self._grab_task: asyncio.Task | None = None
         self._srt_url: str | None = None
         self._stream_requested_at = 0.0
         self._last_image: bytes | None = None
@@ -100,31 +106,69 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
     async def async_camera_image(
         self, width: int | None = None, height: int | None = None
     ) -> bytes | None:
-        """Return a frame from the oven camera, or the last one when idle."""
+        """Return a fresh frame if one arrives in time, else the last frame."""
         if not self._is_cooking:
             return self._last_image
 
-        async with self._lock:
-            try:
-                srt_url = await self._async_ensure_stream()
-            except Exception as err:
-                _LOGGER.warning("Could not start the oven camera stream: %s", err)
-                return self._last_image
+        self._schedule_idle_stop()
+        if self._grab_task is None or self._grab_task.done():
+            self._grab_task = self.hass.async_create_background_task(
+                self._async_grab_frame(), f"{self.entity_id} frame grab"
+            )
+        try:
+            await asyncio.wait_for(asyncio.shield(self._grab_task), SNAPSHOT_WAIT_SECONDS)
+        except TimeoutError:
+            pass
+        return self._last_image
 
-            image = await async_get_image(self.hass, srt_url, width=width, height=height)
-            if image is None:
-                # The publisher may still be coming up; try once more
-                await asyncio.sleep(STREAM_WARMUP_SECONDS)
-                image = await async_get_image(
-                    self.hass, srt_url, width=width, height=height
-                )
+    async def _async_grab_frame(self) -> None:
+        """Start the stream if needed and read one JPEG frame with ffmpeg."""
+        try:
+            srt_url = await self._async_ensure_stream()
+        except Exception as err:
+            _LOGGER.warning("Could not start the oven camera stream: %s", err)
+            return
 
-            self._schedule_idle_stop()
-            if image:
-                self._last_image = image
-            else:
-                _LOGGER.warning("No frame received from the oven camera stream")
-            return self._last_image
+        binary = get_ffmpeg_manager(self.hass).binary
+        proc = await asyncio.create_subprocess_exec(
+            binary,
+            "-hide_banner",
+            "-loglevel",
+            "warning",
+            "-i",
+            srt_url,
+            "-frames:v",
+            "1",
+            "-c:v",
+            "mjpeg",
+            "-f",
+            "image2pipe",
+            "pipe:1",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), FRAME_GRAB_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            proc.kill()
+            stdout, stderr = await proc.communicate()
+            stderr += b"\n(timed out waiting for a frame)"
+
+        if stdout:
+            self._last_image = stdout
+            return
+
+        # Passphrase must not reach the log
+        detail = stderr.decode(errors="replace").strip()
+        if self._srt_url:
+            detail = detail.replace(self._srt_url, "<stream url>")
+        _LOGGER.warning(
+            "No frame from the oven camera stream (ffmpeg exit %s): %s",
+            proc.returncode,
+            detail[-1500:] or "no output",
+        )
 
     async def _async_ensure_stream(self) -> str:
         """Start or keep alive the oven's live stream and return its SRT URL."""
@@ -180,6 +224,8 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
 
     async def async_will_remove_from_hass(self) -> None:
         """Stop streaming when the entity is removed."""
+        if self._grab_task and not self._grab_task.done():
+            self._grab_task.cancel()
         if self._cancel_idle_stop:
             self._cancel_idle_stop()
             self._cancel_idle_stop = None
