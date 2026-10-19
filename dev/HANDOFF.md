@@ -116,12 +116,16 @@ The user owns an **Anova Precision Oven v2** (`oven_v2`) and uses a custom Home 
   - **Integration options:** `camera_relay` is set to that hostname; `camera_live_view` is false.
   - **Verified:** `camera.kitchen_anova_precision_cooker_camera` returned a real 900×1422 JPEG. The add-on idles at about 0.3% CPU and 24 MB.
   - **Snapshot timing:** the first request after a start takes more than HA's 8-second wait, so it returns 500. The frame then arrives in the background, and later requests return it.
+- **Live view verified on HA (2026-10-19 17:44–17:53):**
+  - **Option:** `camera_live_view` is now true.
+  - **Playback:** HA's camera dialog played the oven video through go2rtc's `ffmpeg:` source, transcoding VP8 to H264.
+  - **CPU:** `sensor.ha_vm_cpu_usage` (a 4-vCPU VM) went from about 3.5% to about 12.5% while watching. It was back to 3.4% about 2 minutes after the dialog closed, and the relay stopped pulling.
+  - **Oven off:** the dialog shows "Camera has no stream source", as intended.
 - **Fixes found on HA:**
   - **CA certificates:** the official MediaMTX image has none, so the add-on copies the bundle from Alpine.
   - **Relay restarts:** they drop the paths added through the API, so the camera now checks the path before each use.
   - **Reload error:** reloading after startup no longer tries to remove the already-fired start listener.
 - **Not yet done:**
-  - **Live view:** the transcoding path (`ffmpeg:` source in HA's go2rtc) is untested on HA; it was tested only with go2rtc on the PC.
   - **Start-command race:** the `unauthorized` reply on the first start after restart is still open.
   - **WebSocket shutdown warning:** still open.
 
