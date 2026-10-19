@@ -111,6 +111,20 @@ The user owns an **Anova Precision Oven v2** (`oven_v2`) and uses a custom Home 
   - keep-alive: counts relay readers as activity, so long live viewing isn't idle-stopped.
 - **Removed:** `ice_probe.py`, the go2rtc WHEP diagnostics, and the go2rtc-path tests. `dev/tests/whep_probe.py` also hard-coded the real WHEP URL; it's removed now but remains in git history.
 
+- **Installed on the user's HA (2026-10-19 17:25):**
+  - **Add-on repository:** `https://github.com/alex-campb/ha-anova-precision-oven#fix-oven-v2-cook-payload`, pinned to the branch. The add-on slug is `9564e52d_anova_camera_relay`, its hostname `9564e52d-anova-camera-relay`, and the installed version is 1.21.2-2.
+  - **Integration options:** `camera_relay` is set to that hostname; `camera_live_view` is false.
+  - **Verified:** `camera.kitchen_anova_precision_cooker_camera` returned a real 900×1422 JPEG. The add-on idles at about 0.3% CPU and 24 MB.
+  - **Snapshot timing:** the first request after a start takes more than HA's 8-second wait, so it returns 500. The frame then arrives in the background, and later requests return it.
+- **Fixes found on HA:**
+  - **CA certificates:** the official MediaMTX image has none, so the add-on copies the bundle from Alpine.
+  - **Relay restarts:** they drop the paths added through the API, so the camera now checks the path before each use.
+  - **Reload error:** reloading after startup no longer tries to remove the already-fired start listener.
+- **Not yet done:**
+  - **Live view:** the transcoding path (`ffmpeg:` source in HA's go2rtc) is untested on HA; it was tested only with go2rtc on the PC.
+  - **Start-command race:** the `unauthorized` reply on the first start after restart is still open.
+  - **WebSocket shutdown warning:** still open.
+
 ## Earlier next steps (superseded by the relay)
 1. **Recommended:** the user adds `go2rtc: debug_ui: true` to `configuration.yaml` and restarts. That exposes go2rtc's UI at `http://<HA>:11984`, which shows the exact WHEP or ICE error. The agent can't edit `configuration.yaml`.
 2. **Wait for aiortc:** once a release supports av 19, switch to direct WHEP with aiortc. A working client (`whep.py`) existed in commit `032dbf9` and was tested end to end against a local WHEP server.
