@@ -6,6 +6,8 @@ CONF_TOKEN = "token"
 CONF_APP_EMAIL = "app_email"
 CONF_APP_PASSWORD = "app_password"
 CONF_APP_REFRESH_TOKEN = "app_refresh_token"
+CONF_CAMERA_RELAY = "camera_relay"
+CONF_CAMERA_LIVE_VIEW = "camera_live_view"
 
 ACCESSORIES_APO = "APO"
 

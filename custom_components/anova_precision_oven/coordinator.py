@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import logging
 import ssl
@@ -492,6 +492,8 @@ class AnovaOvenRuntimeData:
     """Runtime data stored on the config entry."""
 
     coordinator: AnovaOvenCoordinator
+    # Options the entry was set up with; a change to them needs a reload
+    options: dict[str, Any] = field(default_factory=dict)
 
 
 AnovaOvenConfigEntry = ConfigEntry[AnovaOvenRuntimeData]

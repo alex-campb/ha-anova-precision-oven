@@ -23,10 +23,13 @@ from .const import (
     CONF_APP_EMAIL,
     CONF_APP_PASSWORD,
     CONF_APP_REFRESH_TOKEN,
+    CONF_CAMERA_LIVE_VIEW,
+    CONF_CAMERA_RELAY,
     CONF_TOKEN,
     DOMAIN,
     WS_ENDPOINT,
 )
+from .relay import CameraRelay, RelayError, relay_host
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -135,16 +138,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Optional Anova app login, needed for the lamp on v2 ovens.
-
-    Leave the email empty to remove the login. Only the resulting refresh
-    token is stored, never the password.
-    """
+    """Optional settings: the Anova app login and the oven camera relay."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage the app login."""
+        """Choose what to change."""
+        return self.async_show_menu(step_id="init", menu_options=["app_login", "camera"])
+
+    async def async_step_app_login(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the app login, needed for the lamp and camera on v2 ovens.
+
+        Leave the email empty to remove the login. Only the resulting refresh
+        token is stored, never the password.
+        """
         errors: dict[str, str] = {}
         entry = self.config_entry
 
@@ -152,11 +161,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             email = user_input.get(CONF_APP_EMAIL, "").strip()
             password = user_input.get(CONF_APP_PASSWORD, "")
             data = {**entry.data}
+            options = {**entry.options}
 
             if not email:
                 data.pop(CONF_APP_REFRESH_TOKEN, None)
+                options.pop(CONF_APP_EMAIL, None)
                 self.hass.config_entries.async_update_entry(entry, data=data)
-                return self.async_create_entry(data={})
+                return self.async_create_entry(data=options)
 
             if not password:
                 errors["base"] = "app_password_required"
@@ -172,7 +183,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     data[CONF_APP_REFRESH_TOKEN] = refresh_token
                     self.hass.config_entries.async_update_entry(entry, data=data)
-                    return self.async_create_entry(data={CONF_APP_EMAIL: email})
+                    return self.async_create_entry(
+                        data={**options, CONF_APP_EMAIL: email}
+                    )
 
         schema = vol.Schema(
             {
@@ -182,7 +195,53 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(CONF_APP_PASSWORD, default=""): str,
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="app_login", data_schema=schema, errors=errors
+        )
+
+    async def async_step_camera(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Set the camera relay (MediaMTX) and whether live view is offered.
+
+        Leave the relay empty to turn the camera off.
+        """
+        errors: dict[str, str] = {}
+        entry = self.config_entry
+
+        if user_input is not None:
+            host = relay_host(user_input.get(CONF_CAMERA_RELAY, ""))
+            live_view = bool(user_input.get(CONF_CAMERA_LIVE_VIEW, False))
+            if host:
+                try:
+                    await CameraRelay(
+                        async_get_clientsession(self.hass), host
+                    ).async_check()
+                except RelayError as err:
+                    _LOGGER.warning("Oven camera relay check failed: %s", err)
+                    errors["base"] = "relay_cannot_connect"
+            if not errors:
+                return self.async_create_entry(
+                    data={
+                        **entry.options,
+                        CONF_CAMERA_RELAY: host,
+                        CONF_CAMERA_LIVE_VIEW: live_view and bool(host),
+                    }
+                )
+
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_CAMERA_RELAY,
+                    default=entry.options.get(CONF_CAMERA_RELAY, ""),
+                ): str,
+                vol.Optional(
+                    CONF_CAMERA_LIVE_VIEW,
+                    default=entry.options.get(CONF_CAMERA_LIVE_VIEW, False),
+                ): bool,
+            }
+        )
+        return self.async_show_form(step_id="camera", data_schema=schema, errors=errors)
 
 
 class InvalidToken(HomeAssistantError):

@@ -96,7 +96,22 @@ The user owns an **Anova Precision Oven v2** (`oven_v2`) and uses a custom Home 
 - **Start-command race:** right after restart, the camera's first `CMD_APO_START_LIVE_STREAM` over the app login returned `unauthorized`, and the same command succeeded a minute later. `AnovaAppSession` opens a fresh socket per command and sends at once, whereas the app waits for the socket to open and checks its queue again after 500 ms. Waiting for the first server event, or retrying once on `unauthorized`, would probably fix it. Not done yet.
 - **Temporary diagnostic code:** `camera.py` still contains `_async_go2rtc_stream_info` (reads go2rtc's stream status through HA's private `_rest_client`) and `_async_whep_probe` (posts a placeholder offer to Cloudflare and runs `ice_probe`). These and `ice_probe.py` should be removed once the camera is resolved.
 
-## Next steps offered to the user, none chosen yet
+## Camera now uses the MediaMTX relay (2026-10-19)
+- **Add-on:** `anova_camera_relay/`, an add-on built from `bluenviron/mediamtx:1.21.2`. The repo root has a `repository.yaml`, so the fork itself is the add-on repository.
+  - **Ports:** RTSP 8554 and API 9997, internal Supervisor network only, with auth limited to 172.30.32.0/23. No ports are published on the host.
+  - **On demand:** paths are pulled only while someone reads them.
+- **Options:** the integration's options are now a menu: **App login** and **Oven camera**.
+  - **Oven camera:** relay hostname (empty means no camera entity) and **Live view**, off by default.
+  - **Saving:** the camera step checks the relay API. Any options change reloads the entry; `runtime_data.options` holds the options the entry was set up with.
+- **`camera.py`:**
+  - starts the oven stream and keep-alive as before;
+  - points the relay path `anova_oven_<device_id>` at the WHEP URL (`relay.py`, MediaMTX `config/paths/replace`);
+  - snapshots: ffmpeg reads one frame from the relay;
+  - live view: `stream_source()` returns `ffmpeg:rtsp://<relay>:8554/<path>#video=h264` for HA's go2rtc;
+  - keep-alive: counts relay readers as activity, so long live viewing isn't idle-stopped.
+- **Removed:** `ice_probe.py`, the go2rtc WHEP diagnostics, and the go2rtc-path tests. `dev/tests/whep_probe.py` also hard-coded the real WHEP URL; it's removed now but remains in git history.
+
+## Earlier next steps (superseded by the relay)
 1. **Recommended:** the user adds `go2rtc: debug_ui: true` to `configuration.yaml` and restarts. That exposes go2rtc's UI at `http://<HA>:11984`, which shows the exact WHEP or ICE error. The agent can't edit `configuration.yaml`.
 2. **Wait for aiortc:** once a release supports av 19, switch to direct WHEP with aiortc. A working client (`whep.py`) existed in commit `032dbf9` and was tested end to end against a local WHEP server.
 3. **Stop here:** remove the diagnostics and mark the camera as experimental, or remove it.

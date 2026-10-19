@@ -58,9 +58,11 @@ async def main():
     # reload rule
     reloads = []
     hass = types.SimpleNamespace(config_entries=types.SimpleNamespace(async_reload=lambda eid: reloads.append(eid) or asyncio.sleep(0)))
-    def entry(tok, sess): return types.SimpleNamespace(entry_id="e", data={"app_refresh_token": tok} if tok else {}, runtime_data=types.SimpleNamespace(coordinator=types.SimpleNamespace(app_session=sess)))
+    def entry(tok, sess, options=None, setup_options=None): return types.SimpleNamespace(entry_id="e", data={"app_refresh_token": tok} if tok else {}, options=options or {}, runtime_data=types.SimpleNamespace(coordinator=types.SimpleNamespace(app_session=sess), options=setup_options or {}))
     s = types.SimpleNamespace(refresh_token="RT2")
-    for label, e in [("rotation", entry("RT2", s)), ("new login", entry("RT9", None)), ("removed", entry(None, s)), ("unchanged none", entry(None, None))]:
+    relay = {"camera_relay": "abcd-anova-camera-relay", "camera_live_view": False}
+    for label, e in [("rotation", entry("RT2", s)), ("new login", entry("RT9", None)), ("removed", entry(None, s)), ("unchanged none", entry(None, None)),
+                     ("camera relay set", entry("RT2", s, relay)), ("camera options unchanged", entry("RT2", s, relay, dict(relay)))]:
         reloads.clear(); await integ._async_update_listener(hass, e); print(f"reload on {label}:", bool(reloads))
     srv.close()
 asyncio.run(main())

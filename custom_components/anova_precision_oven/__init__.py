@@ -100,7 +100,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaOvenConfigEntry) ->
         )
 
     coordinator = AnovaOvenCoordinator(hass, entry.data[CONF_TOKEN])
-    entry.runtime_data = AnovaOvenRuntimeData(coordinator=coordinator)
+    entry.runtime_data = AnovaOvenRuntimeData(
+        coordinator=coordinator, options=dict(entry.options)
+    )
 
     if refresh_token := entry.data.get(CONF_APP_REFRESH_TOKEN):
         ssl_context = await coordinator._create_ssl_context()
@@ -141,11 +143,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaOvenConfigEntry) ->
 async def _async_update_listener(
     hass: HomeAssistant, entry: AnovaOvenConfigEntry
 ) -> None:
-    """Reload when the app login is added, changed or removed in options."""
+    """Reload when the app login or other options change."""
     app_session = entry.runtime_data.coordinator.app_session
     current = app_session.refresh_token if app_session else None
     # A token rotated by the session itself is already in use; no reload
-    if entry.data.get(CONF_APP_REFRESH_TOKEN) != current:
+    if (
+        entry.data.get(CONF_APP_REFRESH_TOKEN) != current
+        or dict(entry.options) != entry.runtime_data.options
+    ):
         await hass.config_entries.async_reload(entry.entry_id)
 
 
