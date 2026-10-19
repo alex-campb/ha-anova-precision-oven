@@ -99,9 +99,10 @@ def _normalize_v2_state(state: dict[str, Any]) -> None:
         _add_fahrenheit(nodes.get("temperatureBulbs"))
         _add_fahrenheit(nodes.get("temperatureProbe"))
 
-        # v2 has cavityLamp/doorLamp instead of lamp
-        if "lamp" not in nodes and isinstance(nodes.get("cavityLamp"), dict):
-            nodes["lamp"] = nodes["cavityLamp"]
+        # v2 reports the lamp that CMD_APO_SET_LAMP and the app control as
+        # doorLamp (verified on an oven_v2); cavityLamp does not change
+        if "lamp" not in nodes and isinstance(nodes.get("doorLamp"), dict):
+            nodes["lamp"] = nodes["doorLamp"]
 
         # v2 timer reports a start time instead of a running count
         timer = nodes.get("timer")

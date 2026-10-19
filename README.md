@@ -77,7 +77,7 @@ The climate entity is intentionally simple.
 
 ## Anova App Login (optional, for the lamp)
 
-Anova refuses the lamp command (`unauthorized`) when it is sent with a Personal Access Token. To control the lamp, open the integration's **Configure** dialog and sign in with your Anova app email and password. The integration then sends lamp commands over a separate connection that authenticates the way the Anova app does. Without the login, the lamp switch behaves as before.
+Anova refuses the lamp command (`unauthorized`) when it is sent with a Personal Access Token. Verified on an oven_v2: with the login, `CMD_APO_SET_LAMP` turns the oven light on and off, and the oven reports it as `doorLamp`. To control the lamp, open the integration's **Configure** dialog and sign in with your Anova app email and password. The integration then sends lamp commands over a separate connection that authenticates the way the Anova app does. Without the login, the lamp switch behaves as before.
 
 - The login must be an email and password. If you sign in to Anova with Google, Facebook or Apple, first set a password for the same email on the [Anova password reset page](https://anovaculinary.io/ali/password-reset), then use that password here.
 - The password is not stored; only the sign-in's refresh token is kept.
