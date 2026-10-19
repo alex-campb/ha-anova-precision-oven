@@ -13,7 +13,7 @@
       "invalid_token": "Invalid token format. Token must start with 'anova-'",
       "cannot_connect": "Failed to connect to Anova API",
       "unknown": "Unexpected error occurred",
-      "app_invalid_auth": "Anova rejected the email or password",
+      "app_invalid_auth": "Anova rejected the email or password. If you use Google, Facebook or Apple sign-in, set a password first (see the link above).",
       "app_password_required": "Enter your Anova password"
     },
     "abort": {
@@ -48,7 +48,7 @@
     "step": {
       "init": {
         "title": "Anova app login (optional)",
-        "description": "Your Personal Access Token is not allowed to control the lamp. Signing in with your Anova app email and password lets Home Assistant send lamp commands the way the app does. Only works for email/password accounts (not Apple or Google sign-in). Unofficial: it may stop working if Anova changes its app. Your password is not stored. Leave the email empty to remove the login.",
+        "description": "Your Personal Access Token is not allowed to control the lamp. Signing in with your Anova app email and password lets Home Assistant send lamp commands the way the app does.\n\nThis needs an email and password login. If you sign in to Anova with Google, Facebook or Apple, first set a password on the [Anova password reset page](https://anovaculinary.io/ali/password-reset) using your account's email, then enter it here.\n\nYour password is not stored. This is unofficial and may stop working if Anova changes its app. Leave the email empty to remove the login.",
         "data": {
           "app_email": "Anova email",
           "app_password": "Anova password"
@@ -56,7 +56,7 @@
       }
     },
     "error": {
-      "app_invalid_auth": "Anova rejected the email or password",
+      "app_invalid_auth": "Anova rejected the email or password. If you use Google, Facebook or Apple sign-in, set a password first (see the link above).",
       "app_password_required": "Enter your Anova password",
       "cannot_connect": "Failed to connect to Anova"
     }
