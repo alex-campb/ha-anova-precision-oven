@@ -15,5 +15,8 @@
   "version": "1.3.0",
   "after_dependencies": [
     "go2rtc"
+  ],
+  "dependencies": [
+    "ffmpeg"
   ]
 }
