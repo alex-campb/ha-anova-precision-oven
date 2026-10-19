@@ -250,13 +250,19 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
                         go2rtc_info = await _async_go2rtc_stream_info(provider, self)
                 except TimeoutError:
                     go2rtc_info = "no reply from go2rtc"
-            stdout, stderr = await asyncio.wait_for(
-                communicate, FRAME_GRAB_TIMEOUT_SECONDS / 2
-            )
-        except TimeoutError:
-            proc.kill()
+                # asyncio.wait, not wait_for: wait_for would cancel communicate,
+                # losing ffmpeg's output once it is killed below
+                done, _ = await asyncio.wait(
+                    {communicate}, timeout=FRAME_GRAB_TIMEOUT_SECONDS / 2
+                )
+            if not done:
+                proc.kill()
             stdout, stderr = await communicate
-            stderr += b"\n(timed out waiting for a frame)"
+            if not done:
+                stderr += b"\n(timed out waiting for a frame)"
+        finally:
+            if proc.returncode is None:
+                proc.kill()
 
         elapsed = time.monotonic() - started
         if stdout:
