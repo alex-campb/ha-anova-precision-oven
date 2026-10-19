@@ -78,7 +78,15 @@ The user owns an **Anova Precision Oven v2** (`oven_v2`) and uses a custom Home 
 - **Result on the HA host (2026-10-19 16:34):**
   - **ICE check:** succeeded in 177 ms, sent from `192.168.0.139`. So UDP from the HA host to Cloudflare's media port works, yet go2rtc on the same host still shows no selected pair and 0 bytes. The fault is in go2rtc/pion's session, not the host's network.
   - **Unexplained:** the ICE check's mapped address was `202.128.117.17`, while plain STUN from the same host and all checks from the PC map to `206.83.119.82`. Traffic to `141.101.90.0` appears to leave by a different route, possibly Tailscale (the host has `tailscale0`) or ISP routing. The check worked anyway.
-  - **Suggested next test:** run go2rtc 1.9.14 on another LAN machine with HA's `webrtc` config (`listen: ":18555/tcp"`, `ice_servers: []`) and source `webrtc:<WHEP URL>`. That separates "go2rtc vs Cloudflare" from "this host".
+  - **Done (see ROOT CAUSE):** ran go2rtc 1.9.14 on another LAN machine with HA's `webrtc` config (`listen: ":18555/tcp"`, `ice_servers: []`) and source `webrtc:<WHEP URL>`. That separates "go2rtc vs Cloudflare" from "this host".
+- **ROOT CAUSE (verified 2026-10-19 with go2rtc 1.9.14 run on the user's PC):**
+  - **The oven publishes VP8.** Cloudflare accepts a WHEP offer (201) only when it includes VP8. Offers with only H264, H265 or VP9 get **HTTP 406**, with an SDP-looking body.
+  - **go2rtc can't offer VP8:** its WebRTC client registers only H264 and H265 for video, in 1.9.14 and on master.
+  - **go2rtc ignores the rejection:** `whepClient` never checks the status code, so it applies the 406 body as an answer. pion then runs ICE against a session Cloudflare never created: 8 checks per pair, no replies, failed after 30 seconds, retry. Captured with a logging proxy, this reproduces on the PC exactly as on HA.
+  - **The SRT dead end too:** SRT carries MPEG-TS, which doesn't carry VP8.
+  - **Conclusion:** HA's go2rtc can't play this camera. A fix needs a WebRTC client that can receive VP8.
+  - **Option 1:** vendor aiortc 1.15 into the integration and test it against HA's `av` 19. aiortc pins `av<18`, so it can't go in `manifest.json` requirements. FFmpeg's native `vp8` decoder needs no libvpx.
+  - **Option 2:** wait for go2rtc to add VP8, which would also need ffmpeg transcoding to H264 for RTSP and snapshots.
 - **Start-command race:** right after restart, the camera's first `CMD_APO_START_LIVE_STREAM` over the app login returned `unauthorized`, and the same command succeeded a minute later. `AnovaAppSession` opens a fresh socket per command and sends at once, whereas the app waits for the socket to open and checks its queue again after 500 ms. Waiting for the first server event, or retrying once on `unauthorized`, would probably fix it. Not done yet.
 - **Temporary diagnostic code:** `camera.py` still contains `_async_go2rtc_stream_info` (reads go2rtc's stream status through HA's private `_rest_client`) and `_async_whep_probe` (posts a placeholder offer to Cloudflare and runs `ice_probe`). These and `ice_probe.py` should be removed once the camera is resolved.
 
