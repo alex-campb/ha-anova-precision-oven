@@ -19,7 +19,9 @@ import asyncio
 from datetime import timedelta
 import logging
 import re
+import secrets
 import time
+from urllib.parse import urljoin
 from typing import Any
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
@@ -32,6 +34,7 @@ except ImportError:
     # Older HA named them after the entity_id
     get_camera_identifier = None
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
@@ -134,6 +137,70 @@ async def _async_go2rtc_stream_info(provider: Any, camera: Camera) -> str:
         )
     consumers = len(info.get("consumers") or [])
     return f"{len(parts)} producer(s) {' '.join(parts)}; {consumers} consumer(s)"
+
+
+def _probe_offer() -> str:
+    """Build a receive-only SDP offer, enough for a WHEP server to answer.
+
+    Only the answer is read; no media connection is made.
+    """
+    fingerprint = ":".join(f"{b:02X}" for b in secrets.token_bytes(32))
+    lines = [
+        "v=0",
+        "o=- 0 0 IN IP4 127.0.0.1",
+        "s=-",
+        "t=0 0",
+        "a=group:BUNDLE 0 1",
+        f"a=ice-ufrag:{secrets.token_hex(4)}",
+        f"a=ice-pwd:{secrets.token_hex(12)}",
+        f"a=fingerprint:sha-256 {fingerprint}",
+        "a=setup:actpass",
+        "m=video 9 UDP/TLS/RTP/SAVPF 96 97 98",
+        "c=IN IP4 0.0.0.0",
+        "a=mid:0",
+        "a=recvonly",
+        "a=rtcp-mux",
+        "a=rtpmap:96 H264/90000",
+        "a=fmtp:96 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+        "a=rtpmap:97 VP8/90000",
+        "a=rtpmap:98 H265/90000",
+        "m=audio 9 UDP/TLS/RTP/SAVPF 111",
+        "c=IN IP4 0.0.0.0",
+        "a=mid:1",
+        "a=recvonly",
+        "a=rtcp-mux",
+        "a=rtpmap:111 opus/48000/2",
+    ]
+    return "\r\n".join(lines) + "\r\n"
+
+
+async def _async_whep_probe(hass: HomeAssistant, whep_url: str) -> str:
+    """Ask the WHEP server for an answer and summarise it (diagnostics only)."""
+    http = async_get_clientsession(hass)
+    try:
+        async with asyncio.timeout(10):
+            async with http.post(
+                whep_url,
+                data=_probe_offer(),
+                headers={"Content-Type": "application/sdp"},
+            ) as resp:
+                status = resp.status
+                body = await resp.text()
+                location = resp.headers.get("Location")
+            if location:
+                async with http.delete(urljoin(whep_url, location)):
+                    pass
+    except Exception as err:
+        return f"failed ({err!r})"
+
+    if status != 201:
+        return f"HTTP {status}: {body.strip()[:200]}"
+    answer = []
+    for section in re.split(r"(?m)^(?=m=)", body)[1:]:
+        kind, port = section.split()[0][2:], section.split()[1]
+        codecs = sorted(set(re.findall(r"a=rtpmap:\d+ ([^/]+)/", section)))
+        answer.append(f"{kind}:{port}:{'/'.join(codecs)}")
+    return f"HTTP 201, answer={answer}"
 
 
 class AnovaOvenCamera(AnovaOvenEntity, Camera):
@@ -269,14 +336,19 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             self._last_image = stdout
             _LOGGER.debug("Oven camera frame via go2rtc RTSP took %.1fs", elapsed)
             return
+        whep_probe = "not run"
+        if self._whep_url and "answer=[]" in go2rtc_info:
+            whep_probe = await _async_whep_probe(self.hass, self._whep_url)
         _LOGGER.warning(
             "No frame from the oven camera after %.0fs; go2rtc snapshot %s; "
-            "ffmpeg via go2rtc RTSP exit %s: %s; go2rtc stream: %s",
+            "ffmpeg via go2rtc RTSP exit %s: %s; go2rtc stream: %s; "
+            "direct WHEP probe: %s",
             elapsed,
             go2rtc_error,
             proc.returncode,
             stderr.decode(errors="replace").strip()[-1500:] or "no output",
             go2rtc_info,
+            whep_probe,
         )
 
     @property
