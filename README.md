@@ -75,7 +75,7 @@ The climate entity is intentionally simple.
 
 `turn_off` sends `CMD_APO_STOP`.
 
-## Anova App Login (optional, for the lamp)
+## Anova App Login (optional, for the lamp and camera)
 
 Anova refuses the lamp command (`unauthorized`) when it is sent with a Personal Access Token. Verified on an oven_v2: with the login, `CMD_APO_SET_LAMP` turns the oven light on and off, and the oven reports it as `doorLamp`. To control the lamp, open the integration's **Configure** dialog and sign in with your Anova app email and password. The integration then sends lamp commands over a separate connection that authenticates the way the Anova app does. Without the login, the lamp switch behaves as before.
 
@@ -84,15 +84,24 @@ Anova refuses the lamp command (`unauthorized`) when it is sent with a Personal 
 - This uses the app's unofficial protocol and may stop working if Anova changes its app. Everything else in the integration is unaffected.
 - To remove the login, open **Configure** and clear the email.
 
-### Camera (v2 ovens, with the app login)
+### Camera (v2 ovens, with the app login and the camera relay)
 
-With the app login configured, v2 ovens get a **Camera** entity of the oven cavity. The oven only streams while cooking; otherwise the camera shows the last picture taken.
+v2 ovens can get a **Camera** entity of the oven cavity. The oven only streams while cooking; otherwise the camera shows the last picture taken. Anova may require a subscription for the camera.
 
-Viewing the camera starts the oven's live stream over the app login (`CMD_APO_START_LIVE_STREAM`), which returns a Cloudflare WebRTC (WHEP) playback URL that Home Assistant's built-in go2rtc plays, so go2rtc must be enabled (it is part of `default_config`).
+The oven streams VP8 video over WebRTC from Cloudflare, which Home Assistant's built-in go2rtc cannot receive. The camera therefore needs the **Anova Camera Relay** app (add-on) from this repository, which runs [MediaMTX](https://github.com/bluenviron/mediamtx) to re-serve the stream as RTSP inside Home Assistant:
 
-Snapshots are grabbed in the background, because the WebRTC setup can take longer than the 10 seconds Home Assistant allows a snapshot: first through go2rtc's snapshot API, then with ffmpeg reading go2rtc's local restream with a 30-second limit. A snapshot returns the latest frame, and failures are logged.
+1. **Settings > Apps > App store > ⋮ > Repositories**: add this repository's URL.
+2. Install and start **Anova Camera Relay**, and copy its hostname from the app's Info page.
+3. In the integration, open **Configure > Oven camera** and enter the hostname.
 
-The stream is kept alive while requested and stopped (`CMD_APO_STOP_LIVE_STREAM`) after 10 minutes without a request or when the cook ends. Anova may require a subscription for the camera.
+The relay only pulls video from Anova while something reads it. Snapshots decode one frame with ffmpeg and are cheap. **Live view** (an option in the same dialog, off by default) converts the video to H264 while someone watches; on a 4-vCPU VM this added about 9 percentage points of CPU during viewing, and nothing once the viewer closed. With live view off, camera cards show refreshing snapshots.
+
+Viewing the camera starts the oven's live stream over the app login (`CMD_APO_START_LIVE_STREAM`). The stream is kept alive while watched or requested and stopped (`CMD_APO_STOP_LIVE_STREAM`) after 10 minutes without a request or when the cook ends. The first snapshot after the stream starts can take longer than the 8 seconds Home Assistant waits, so it may fail once; it arrives in the background and later requests return it.
+
+## Known Issues
+
+- **First live-stream start after a restart may be refused.** Right after Home Assistant starts, Anova sometimes answers the first `CMD_APO_START_LIVE_STREAM` with `unauthorized`. The camera recovers on the next request. Likely cause: the app-login connection sends its command as soon as the socket opens, while the Anova app waits briefly first.
+- **Shutdown warning.** On restart, Home Assistant may log that the integration's WebSocket task "was still running after final writes shutdown stage". The integration does not cancel its Anova connection when Home Assistant stops. It is harmless (this predates the v2 changes).
 
 ## Installation
 
