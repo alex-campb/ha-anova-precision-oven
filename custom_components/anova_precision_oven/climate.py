@@ -259,6 +259,45 @@ class AnovaOvenClimate(AnovaOvenEntity, ClimateEntity):
         temperature = max(TEMP_MIN_CELSIUS, min(TEMP_MAX_CELSIUS, temperature))
         fahrenheit = round(temperature * 9 / 5 + 32)
 
+        if device_type == OVEN_TYPE_V2:
+            # v2 stages wrap the node settings in "do"; no "exit" means the
+            # stage runs until stopped.
+            return {
+                "stages": [
+                    {
+                        "id": stage_id,
+                        "do": {
+                            "type": "cook",
+                            "fan": {"speed": DEFAULT_FAN_SPEED},
+                            "heatingElements": {
+                                "top": {"on": True},
+                                "bottom": {"on": False},
+                                "rear": {"on": True},
+                            },
+                            "exhaustVent": {"state": "closed"},
+                            "temperatureBulbs": {
+                                "mode": "dry",
+                                "dry": {"setpoint": {"celsius": temperature}},
+                            },
+                            "steamGenerators": {
+                                "mode": "relative-humidity",
+                                "relativeHumidity": {"setpoint": DEFAULT_HUMIDITY},
+                            },
+                        },
+                        "title": "Cook",
+                        "description": "Home Assistant Cook",
+                        "rackPosition": 3,
+                    }
+                ],
+                "cookId": cook_id,
+                "cookerId": self._device_id,
+                "cookableId": "",
+                "title": "",
+                "type": device_type,
+                "originSource": "api",
+                "cookableType": "manual",
+            }
+
         payload: dict[str, Any] = {
             "stages": [
                 {
@@ -292,9 +331,5 @@ class AnovaOvenClimate(AnovaOvenEntity, ClimateEntity):
             "cookId": cook_id,
             "originSource": "api",
         }
-
-        if device_type == OVEN_TYPE_V2:
-            payload["type"] = "v2"
-            payload["cookerId"] = self._device_id
 
         return payload
