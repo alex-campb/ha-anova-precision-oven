@@ -86,9 +86,9 @@ Anova refuses the lamp command (`unauthorized`) when it is sent with a Personal 
 
 ### Camera (v2 ovens, with the app login)
 
-With the app login configured, v2 ovens get a **Camera** entity with snapshots of the oven cavity. The oven only streams while cooking; when it is not cooking the camera shows the last picture taken.
+With the app login configured, v2 ovens get a **Camera** entity with live view and snapshots of the oven cavity. The oven only streams while cooking.
 
-A snapshot starts the oven's live stream over the app login (`CMD_APO_START_LIVE_STREAM`), grabs one frame from its SRT feed with Home Assistant's ffmpeg, keeps the stream alive while snapshots keep being requested, and stops it (`CMD_APO_STOP_LIVE_STREAM`) after 60 seconds without one. Anova may require a subscription for the camera.
+Viewing or snapshotting the camera starts the oven's live stream over the app login (`CMD_APO_START_LIVE_STREAM`), which returns a Cloudflare WebRTC (WHEP) playback URL. Home Assistant's built-in go2rtc plays it, so go2rtc must be enabled (it is part of `default_config`). The stream is kept alive while it is being requested and stopped (`CMD_APO_STOP_LIVE_STREAM`) after 10 minutes without a request or when the cook ends. Anova may require a subscription for the camera.
 
 ## Installation
 
