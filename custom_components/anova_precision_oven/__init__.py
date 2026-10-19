@@ -19,7 +19,7 @@ from homeassistant.helpers.service import async_register_admin_service
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .app_session import AnovaAppSession
-from .const import CONF_APP_PASSWORD, CONF_APP_REFRESH_TOKEN, CONF_TOKEN, DOMAIN
+from .const import CONF_APP_REFRESH_TOKEN, CONF_TOKEN, DOMAIN
 from .coordinator import (
     AnovaOvenConfigEntry,
     AnovaOvenCoordinator,
@@ -101,11 +101,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaOvenConfigEntry) ->
 
     coordinator = AnovaOvenCoordinator(hass, entry.data[CONF_TOKEN])
     entry.runtime_data = AnovaOvenRuntimeData(coordinator=coordinator)
-
-    # Never keep a password in options (older builds stored an empty field)
-    if CONF_APP_PASSWORD in entry.options:
-        options = {k: v for k, v in entry.options.items() if k != CONF_APP_PASSWORD}
-        hass.config_entries.async_update_entry(entry, options=options)
 
     if refresh_token := entry.data.get(CONF_APP_REFRESH_TOKEN):
         ssl_context = await coordinator._create_ssl_context()

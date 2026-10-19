@@ -13,6 +13,9 @@ TO_REDACT = {
     CONF_TOKEN,
     CONF_APP_REFRESH_TOKEN,
     CONF_APP_EMAIL,
+    # Live-stream playback credentials returned by CMD_APO_START_LIVE_STREAM
+    "srtPlayback",
+    "webRTCPlayback",
     "cookerId",
     "userId",
     "deviceId",
