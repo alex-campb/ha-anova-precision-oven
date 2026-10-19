@@ -63,7 +63,19 @@ The user owns an **Anova Precision Oven v2** (`oven_v2`) and uses a custom Home 
   - **go2rtc's own state:** go2rtc's `/api/streams` shows the WebRTC producer with **no SDP answer, no remote address and 0 bytes received**.
   - **Direct WHEP check from HA:** a request sent straight to the same URL gets **HTTP 201**, with an answer offering H264, H265 and VP8 video plus Opus audio.
   - **Conclusion:** Cloudflare and the network are fine, and the formats match. **go2rtc's WHEP client is failing silently**: go2rtc logs dial errors only at trace level.
-- **Temporary diagnostic code:** `camera.py` still contains `_async_go2rtc_stream_info` (reads go2rtc's stream status through HA's private `_rest_client`) and `_async_whep_probe` (posts a placeholder offer to Cloudflare). Both should be removed once the camera is resolved.
+- **Correction (2026-10-19):** the "no SDP answer" reading above was wrong. go2rtc's WHEP client never stores an SDP, so that field is always empty. Its `medias` come from the applied answer, so the WHEP POST and answer **succeeded**. `remote_addr` is set only when ICE selects a candidate pair, so the failure is **ICE connectivity** between go2rtc and Cloudflare. go2rtc logs nothing for this, because `Conn.Start()` returns nil when the connection closes.
+- **Verified from the user's PC on the same LAN (192.168.0.222):** Cloudflare's answer is ICE-lite, with one candidate `udp 141.101.90.0:1473 host`. aiortc connects with **and without** STUN and decodes 600×950 frames within about 1 to 4 seconds.
+- **App behaviour (decompiled APK, `com.anovaculinary.anovaoven`):**
+  - Offer: video-only and receive-only, with `max-bundle`.
+  - ICE: three STUN servers (Cloudflare and two Google). The app waits a fixed 3 seconds to gather candidates and does no trickle ICE or PATCH.
+  - WHEP: up to 3 POSTs, retrying on any non-201 with 500 ms backoff, doubled each time.
+  - Keep-alive: every 60 seconds.
+- **ICE diagnostics (`ice_probe.py`):** when no frame arrives, the direct WHEP probe now also:
+  - logs the answer's ICE-lite flag and candidates;
+  - sends an authenticated ICE Binding check from the HA host to each UDP IPv4 candidate, while the probe session is open;
+  - sends a plain STUN request to `stun.cloudflare.com:3478`.
+  - **Reading the result:** a successful ICE check means the HA host can reach Cloudflare's media port over UDP, which points at go2rtc and pion. No reply means the problem is UDP from the host. Note that Cloudflare answers 406 to some minimal offers.
+- **Temporary diagnostic code:** `camera.py` still contains `_async_go2rtc_stream_info` (reads go2rtc's stream status through HA's private `_rest_client`) and `_async_whep_probe` (posts a placeholder offer to Cloudflare and runs `ice_probe`). These and `ice_probe.py` should be removed once the camera is resolved.
 
 ## Next steps offered to the user, none chosen yet
 1. **Recommended:** the user adds `go2rtc: debug_ui: true` to `configuration.yaml` and restarts. That exposes go2rtc's UI at `http://<HA>:11984`, which shows the exact WHEP or ICE error. The agent can't edit `configuration.yaml`.

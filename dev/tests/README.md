@@ -37,5 +37,6 @@ library" traceback on import is harmless noise from HA's camera component.
 | `hang_test.py` | A hung go2rtc call and a hung grab are cut off and logged | `python3 hang_test.py $C` |
 | `repro.py` | Regression for the silent grab abort: ffmpeg against an RTSP server that accepts but never answers must end with a warning after 30 s | `python3 repro.py $C` |
 | `info_test.py` | Summary of go2rtc's `/api/streams` producers (codecs, answer, bytes) | `python3 info_test.py $C` |
-| `probe_test.py` | Direct WHEP probe against a local aiortc WHEP server: 409 / 201 + codecs / unreachable, session released | `python3 probe_test.py $C` |
+| `probe_test.py` | Direct WHEP probe against a local aiortc WHEP server: 409 / 201 + codecs + ICE checks / unreachable, session released | `python3 probe_test.py $C` |
+| `ice_check.py` | Live: posts the camera's probe offer to a real WHEP URL and runs `ice_probe`'s ICE check (and a wrong-password check, which must get no reply) plus a plain STUN check. Needs only aiohttp | `python3 ice_check.py $C <WHEP URL>` |
 | `whep_probe.py` | Standalone: posts an aiortc offer to the oven's Cloudflare WHEP URL and prints the answer's codecs. Needs network access to `cloudflarestream.com` and a live stream; the URL is hard-coded for the user's oven | `python3 whep_probe.py` |

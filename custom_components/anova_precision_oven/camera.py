@@ -41,6 +41,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from .const import OVEN_TYPE_V2
 from .coordinator import AnovaOvenConfigEntry, AnovaOvenCoordinator
 from .entity import AnovaOvenEntity
+from .ice_probe import async_check_answer, async_public_stun_check
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -121,29 +122,26 @@ async def _async_go2rtc_stream_info(provider: Any, camera: Camera) -> str:
     except Exception as err:
         return f"unavailable ({err!r})"
 
+    # go2rtc's WHEP client keeps no SDP; its medias come from the applied
+    # answer, and remote_addr is set only once ICE selects a candidate pair
     parts = []
     for prod in info.get("producers") or []:
-        sdp = prod.get("sdp") or ""
-        # Media sections of the WHEP answer: kind, port (0 = rejected), codecs
-        answer = []
-        for section in re.split(r"(?m)^(?=m=)", sdp)[1:]:
-            kind, port = section.split()[0][2:], section.split()[1]
-            codecs = sorted(set(re.findall(r"a=rtpmap:\d+ ([^/]+)/", section)))
-            answer.append(f"{kind}:{port}:{'/'.join(codecs)}")
         parts.append(
             f"[{prod.get('format_name')}/{prod.get('protocol')} "
             f"remote={prod.get('remote_addr')} recv={prod.get('bytes_recv', 0)}B "
-            f"medias={prod.get('medias')} answer={answer}]"
+            f"medias={prod.get('medias')}]"
         )
     consumers = len(info.get("consumers") or [])
     return f"{len(parts)} producer(s) {' '.join(parts)}; {consumers} consumer(s)"
 
 
-def _probe_offer() -> str:
+def _probe_offer() -> tuple[str, str]:
     """Build a receive-only SDP offer, enough for a WHEP server to answer.
 
-    Only the answer is read; no media connection is made.
+    Returns the offer and its ICE username fragment. Only the answer and
+    an ICE check are used; no media connection is made.
     """
+    ufrag = secrets.token_hex(4)
     fingerprint = ":".join(f"{b:02X}" for b in secrets.token_bytes(32))
     lines = [
         "v=0",
@@ -151,7 +149,7 @@ def _probe_offer() -> str:
         "s=-",
         "t=0 0",
         "a=group:BUNDLE 0 1",
-        f"a=ice-ufrag:{secrets.token_hex(4)}",
+        f"a=ice-ufrag:{ufrag}",
         f"a=ice-pwd:{secrets.token_hex(12)}",
         f"a=fingerprint:sha-256 {fingerprint}",
         "a=setup:actpass",
@@ -171,36 +169,60 @@ def _probe_offer() -> str:
         "a=rtcp-mux",
         "a=rtpmap:111 opus/48000/2",
     ]
-    return "\r\n".join(lines) + "\r\n"
+    return "\r\n".join(lines) + "\r\n", ufrag
 
 
 async def _async_whep_probe(hass: HomeAssistant, whep_url: str) -> str:
-    """Ask the WHEP server for an answer and summarise it (diagnostics only)."""
+    """Ask the WHEP server for an answer and summarise it (diagnostics only).
+
+    While the probe's session is open, also send an ICE check from this
+    host to each of the answer's candidates, then a plain STUN request to
+    Cloudflare, to see whether UDP to Cloudflare works from here.
+    """
     http = async_get_clientsession(hass)
+    offer, ufrag = _probe_offer()
+    location = None
+    ice = "not checked"
     try:
         async with asyncio.timeout(10):
             async with http.post(
                 whep_url,
-                data=_probe_offer(),
+                data=offer,
                 headers={"Content-Type": "application/sdp"},
             ) as resp:
                 status = resp.status
                 body = await resp.text()
                 location = resp.headers.get("Location")
-            if location:
-                async with http.delete(urljoin(whep_url, location)):
-                    pass
+        if status == 201:
+            try:
+                async with asyncio.timeout(15):
+                    ice = await async_check_answer(body, ufrag)
+            except Exception as err:
+                ice = f"check failed ({err!r})"
     except Exception as err:
         return f"failed ({err!r})"
+    finally:
+        if location:
+            try:
+                async with asyncio.timeout(5):
+                    async with http.delete(urljoin(whep_url, location)):
+                        pass
+            except Exception:
+                pass
+    try:
+        async with asyncio.timeout(10):
+            stun = await async_public_stun_check()
+    except Exception as err:
+        stun = f"STUN check failed ({err!r})"
 
     if status != 201:
-        return f"HTTP {status}: {body.strip()[:200]}"
+        return f"HTTP {status}: {body.strip()[:200]}; {stun}"
     answer = []
     for section in re.split(r"(?m)^(?=m=)", body)[1:]:
         kind, port = section.split()[0][2:], section.split()[1]
         codecs = sorted(set(re.findall(r"a=rtpmap:\d+ ([^/]+)/", section)))
         answer.append(f"{kind}:{port}:{'/'.join(codecs)}")
-    return f"HTTP 201, answer={answer}"
+    return f"HTTP 201, answer={answer}; {ice}; {stun}"
 
 
 class AnovaOvenCamera(AnovaOvenEntity, Camera):
@@ -337,7 +359,7 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             _LOGGER.debug("Oven camera frame via go2rtc RTSP took %.1fs", elapsed)
             return
         whep_probe = "not run"
-        if self._whep_url and "answer=[]" in go2rtc_info:
+        if self._whep_url:
             whep_probe = await _async_whep_probe(self.hass, self._whep_url)
         _LOGGER.warning(
             "No frame from the oven camera after %.0fs; go2rtc snapshot %s; "
