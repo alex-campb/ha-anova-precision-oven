@@ -1,0 +1,585 @@
+{
+ "v1_dry_cooking": {
+  "binary.connectivity": true,
+  "binary.door": false,
+  "binary.vent": true,
+  "binary.water_tank": false,
+  "climate": {
+   "action": "off",
+   "attrs": {
+    "humidity": 100,
+    "temperature_mode": "dry",
+    "timer_current": 0,
+    "timer_initial": 0,
+    "timer_mode": "idle"
+   },
+   "cur": 24.36,
+   "features": 385,
+   "max": 250,
+   "mode": "off",
+   "preset": null,
+   "presets": null,
+   "target": 58.33
+  },
+  "commands": [
+   [
+    "CMD_APO_START",
+    {
+     "cookId": "uuid-0",
+     "originSource": "api",
+     "stages": [
+      {
+       "description": "Home Assistant Cook",
+       "fan": {
+        "speed": 100
+       },
+       "heatingElements": {
+        "bottom": {
+         "on": false
+        },
+        "rear": {
+         "on": true
+        },
+        "top": {
+         "on": true
+        }
+       },
+       "id": "uuid-1",
+       "steamGenerators": {
+        "mode": "relative-humidity",
+        "relativeHumidity": {
+         "setpoint": 0
+        }
+       },
+       "temperatureBulbs": {
+        "dry": {
+         "setpoint": {
+          "celsius": 58.33,
+          "fahrenheit": 137
+         }
+        },
+        "mode": "dry"
+       },
+       "title": "Cook",
+       "type": "cook",
+       "userActionRequired": false,
+       "vent": {
+        "open": false
+       }
+      }
+     ]
+    }
+   ],
+   [
+    "CMD_APO_STOP",
+    null
+   ],
+   [
+    "CMD_APO_SET_LAMP",
+    {
+     "on": true
+    }
+   ]
+  ],
+  "sensor.cook_session": [
+   true,
+   "idle",
+   {}
+  ],
+  "sensor.dry_setpoint": [
+   true,
+   58.33,
+   null
+  ],
+  "sensor.fan_speed": [
+   true,
+   0,
+   null
+  ],
+  "sensor.firmware": [
+   true,
+   "2.1.7",
+   null
+  ],
+  "sensor.hardware": [
+   true,
+   "120V Universal",
+   null
+  ],
+  "sensor.heating_elements": [
+   true,
+   "Bottom",
+   {
+    "bottom": true,
+    "rear": false,
+    "top": false
+   }
+  ],
+  "sensor.humidity": [
+   true,
+   100,
+   null
+  ],
+  "sensor.humidity_setpoint": [
+   true,
+   null,
+   null
+  ],
+  "sensor.mode": [
+   true,
+   "idle",
+   {
+    "firmware_version": "2.1.7",
+    "hardware_version": "120V Universal",
+    "temperature_mode": "dry",
+    "temperature_unit": "F"
+   }
+  ],
+  "sensor.probe_setpoint": [
+   false,
+   null,
+   null
+  ],
+  "sensor.probe_temp": [
+   false,
+   null,
+   {
+    "connected": false,
+    "fahrenheit": null,
+    "setpoint_celsius": null,
+    "setpoint_fahrenheit": null
+   }
+  ],
+  "sensor.rack_position": [
+   true,
+   null,
+   null
+  ],
+  "sensor.temp_dry": [
+   true,
+   24.36,
+   {
+    "fahrenheit": 75.85,
+    "setpoint_celsius": 58.33,
+    "setpoint_fahrenheit": 137
+   }
+  ],
+  "sensor.temp_wet": [
+   true,
+   24.36,
+   {
+    "fahrenheit": 75.85,
+    "setpoint_celsius": null,
+    "setpoint_fahrenheit": null
+   }
+  ],
+  "sensor.timer": [
+   true,
+   0,
+   {
+    "initial": 0,
+    "mode": "idle"
+   }
+  ],
+  "sensor.timer_start_type": [
+   true,
+   null,
+   null
+  ],
+  "sensor.wet_setpoint": [
+   false,
+   null,
+   null
+  ],
+  "switch.lamp": false
+ },
+ "v1_idle": {
+  "binary.connectivity": true,
+  "binary.door": false,
+  "binary.vent": true,
+  "binary.water_tank": false,
+  "climate": {
+   "action": "off",
+   "attrs": {
+    "humidity": 100,
+    "temperature_mode": "dry",
+    "timer_current": 0,
+    "timer_initial": 0,
+    "timer_mode": "idle"
+   },
+   "cur": 24.36,
+   "features": 385,
+   "max": 250,
+   "mode": "off",
+   "preset": null,
+   "presets": null,
+   "target": 58.33
+  },
+  "commands": [
+   [
+    "CMD_APO_START",
+    {
+     "cookId": "uuid-0",
+     "originSource": "api",
+     "stages": [
+      {
+       "description": "Home Assistant Cook",
+       "fan": {
+        "speed": 100
+       },
+       "heatingElements": {
+        "bottom": {
+         "on": false
+        },
+        "rear": {
+         "on": true
+        },
+        "top": {
+         "on": true
+        }
+       },
+       "id": "uuid-1",
+       "steamGenerators": {
+        "mode": "relative-humidity",
+        "relativeHumidity": {
+         "setpoint": 0
+        }
+       },
+       "temperatureBulbs": {
+        "dry": {
+         "setpoint": {
+          "celsius": 58.33,
+          "fahrenheit": 137
+         }
+        },
+        "mode": "dry"
+       },
+       "title": "Cook",
+       "type": "cook",
+       "userActionRequired": false,
+       "vent": {
+        "open": false
+       }
+      }
+     ]
+    }
+   ],
+   [
+    "CMD_APO_STOP",
+    null
+   ],
+   [
+    "CMD_APO_SET_LAMP",
+    {
+     "on": true
+    }
+   ]
+  ],
+  "sensor.cook_session": [
+   true,
+   "idle",
+   {}
+  ],
+  "sensor.dry_setpoint": [
+   true,
+   58.33,
+   null
+  ],
+  "sensor.fan_speed": [
+   true,
+   0,
+   null
+  ],
+  "sensor.firmware": [
+   true,
+   "2.1.7",
+   null
+  ],
+  "sensor.hardware": [
+   true,
+   "120V Universal",
+   null
+  ],
+  "sensor.heating_elements": [
+   true,
+   "Bottom",
+   {
+    "bottom": true,
+    "rear": false,
+    "top": false
+   }
+  ],
+  "sensor.humidity": [
+   true,
+   100,
+   null
+  ],
+  "sensor.humidity_setpoint": [
+   true,
+   null,
+   null
+  ],
+  "sensor.mode": [
+   true,
+   "idle",
+   {
+    "firmware_version": "2.1.7",
+    "hardware_version": "120V Universal",
+    "temperature_mode": "dry",
+    "temperature_unit": "F"
+   }
+  ],
+  "sensor.probe_setpoint": [
+   false,
+   null,
+   null
+  ],
+  "sensor.probe_temp": [
+   false,
+   null,
+   {
+    "connected": false,
+    "fahrenheit": null,
+    "setpoint_celsius": null,
+    "setpoint_fahrenheit": null
+   }
+  ],
+  "sensor.rack_position": [
+   true,
+   null,
+   null
+  ],
+  "sensor.temp_dry": [
+   true,
+   24.36,
+   {
+    "fahrenheit": 75.85,
+    "setpoint_celsius": 58.33,
+    "setpoint_fahrenheit": 137
+   }
+  ],
+  "sensor.temp_wet": [
+   true,
+   24.36,
+   {
+    "fahrenheit": 75.85,
+    "setpoint_celsius": null,
+    "setpoint_fahrenheit": null
+   }
+  ],
+  "sensor.timer": [
+   true,
+   0,
+   {
+    "initial": 0,
+    "mode": "idle"
+   }
+  ],
+  "sensor.timer_start_type": [
+   true,
+   null,
+   null
+  ],
+  "sensor.wet_setpoint": [
+   false,
+   null,
+   null
+  ],
+  "switch.lamp": false
+ },
+ "v1_wet_cooking": {
+  "binary.connectivity": true,
+  "binary.door": false,
+  "binary.vent": true,
+  "binary.water_tank": false,
+  "climate": {
+   "action": "off",
+   "attrs": {
+    "humidity": 100,
+    "temperature_mode": "wet",
+    "timer_current": 0,
+    "timer_initial": 0,
+    "timer_mode": "idle",
+    "wet_temperature_celsius": 24.36
+   },
+   "cur": 24.36,
+   "features": 385,
+   "max": 250,
+   "mode": "off",
+   "preset": null,
+   "presets": null,
+   "target": 58.33
+  },
+  "commands": [
+   [
+    "CMD_APO_START",
+    {
+     "cookId": "uuid-0",
+     "originSource": "api",
+     "stages": [
+      {
+       "description": "Home Assistant Cook",
+       "fan": {
+        "speed": 100
+       },
+       "heatingElements": {
+        "bottom": {
+         "on": false
+        },
+        "rear": {
+         "on": true
+        },
+        "top": {
+         "on": true
+        }
+       },
+       "id": "uuid-1",
+       "steamGenerators": {
+        "mode": "relative-humidity",
+        "relativeHumidity": {
+         "setpoint": 0
+        }
+       },
+       "temperatureBulbs": {
+        "dry": {
+         "setpoint": {
+          "celsius": 58.33,
+          "fahrenheit": 137
+         }
+        },
+        "mode": "dry"
+       },
+       "title": "Cook",
+       "type": "cook",
+       "userActionRequired": false,
+       "vent": {
+        "open": false
+       }
+      }
+     ]
+    }
+   ],
+   [
+    "CMD_APO_STOP",
+    null
+   ],
+   [
+    "CMD_APO_SET_LAMP",
+    {
+     "on": true
+    }
+   ]
+  ],
+  "sensor.cook_session": [
+   true,
+   "idle",
+   {}
+  ],
+  "sensor.dry_setpoint": [
+   true,
+   58.33,
+   null
+  ],
+  "sensor.fan_speed": [
+   true,
+   0,
+   null
+  ],
+  "sensor.firmware": [
+   true,
+   "2.1.7",
+   null
+  ],
+  "sensor.hardware": [
+   true,
+   "120V Universal",
+   null
+  ],
+  "sensor.heating_elements": [
+   true,
+   "Bottom",
+   {
+    "bottom": true,
+    "rear": false,
+    "top": false
+   }
+  ],
+  "sensor.humidity": [
+   true,
+   100,
+   null
+  ],
+  "sensor.humidity_setpoint": [
+   true,
+   null,
+   null
+  ],
+  "sensor.mode": [
+   true,
+   "idle",
+   {
+    "firmware_version": "2.1.7",
+    "hardware_version": "120V Universal",
+    "temperature_mode": "wet",
+    "temperature_unit": "F"
+   }
+  ],
+  "sensor.probe_setpoint": [
+   false,
+   null,
+   null
+  ],
+  "sensor.probe_temp": [
+   false,
+   null,
+   {
+    "connected": false,
+    "fahrenheit": null,
+    "setpoint_celsius": null,
+    "setpoint_fahrenheit": null
+   }
+  ],
+  "sensor.rack_position": [
+   true,
+   null,
+   null
+  ],
+  "sensor.temp_dry": [
+   true,
+   24.36,
+   {
+    "fahrenheit": 75.85,
+    "setpoint_celsius": 58.33,
+    "setpoint_fahrenheit": 137
+   }
+  ],
+  "sensor.temp_wet": [
+   true,
+   24.36,
+   {
+    "fahrenheit": 75.85,
+    "setpoint_celsius": 55,
+    "setpoint_fahrenheit": 131
+   }
+  ],
+  "sensor.timer": [
+   true,
+   0,
+   {
+    "initial": 0,
+    "mode": "idle"
+   }
+  ],
+  "sensor.timer_start_type": [
+   true,
+   null,
+   null
+  ],
+  "sensor.wet_setpoint": [
+   true,
+   55,
+   null
+  ],
+  "switch.lamp": false
+ }
+}
