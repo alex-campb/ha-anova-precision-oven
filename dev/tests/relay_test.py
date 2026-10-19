@@ -90,6 +90,12 @@ async def main():
                   f"{time.monotonic() - t:.1f}s; commands {sent}")
             print("readers now:", await relay.async_reader_count(snap_only._relay_path))
 
+            # A restarted relay has lost its API-added paths: the next grab must re-add it
+            await http.request("DELETE", f"http://127.0.0.1:9997/v3/config/paths/delete/{snap_only._relay_path}")
+            snap_only._last_image = None
+            await snap_only._async_grab_frame_limited()
+            print("after path lost -> image", bool(snap_only._last_image))
+
             state["state"]["mode"] = "idle"
             sent.clear()
             print("idle -> image kept:", bool(await snap_only.async_camera_image()))

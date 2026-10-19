@@ -67,9 +67,21 @@ class CameraRelay:
         await self._request("GET", "paths/list")
 
     async def async_set_source(self, path: str, whep_url: str) -> None:
-        """Create or update a path that pulls the given WHEP URL on demand."""
+        """Make a path pull the given WHEP URL on demand.
+
+        Paths added through the API live only in the relay's memory, so a
+        restarted relay has none: check every time, but only rewrite the
+        path (which reloads the relay's config) when it is missing or stale.
+        """
         source = "wheps://" + whep_url.split("://", 1)[-1]
-        await self._request("POST", f"config/paths/replace/{path}", {"source": source})
+        try:
+            current = await self._request("GET", f"config/paths/get/{path}")
+        except RelayError:
+            current = None
+        if (current or {}).get("source") != source:
+            await self._request(
+                "POST", f"config/paths/replace/{path}", {"source": source}
+            )
 
     async def async_reader_count(self, path: str) -> int:
         """Number of clients currently reading a path (0 if it is unknown)."""

@@ -111,7 +111,6 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         self._relay_path = f"anova_oven_{device_id}"
         self._lock = asyncio.Lock()
         self._whep_url: str | None = None
-        self._relay_source: str | None = None
         self._last_requested = 0.0
         self._cancel_keepalive: Any = None
         self._probing_providers = False
@@ -240,13 +239,11 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
                     _LOGGER.warning("Could not start the oven camera stream: %s", err)
                     return False
                 self._start_keepalive()
-            if self._relay_source != self._whep_url:
-                try:
-                    await self._relay.async_set_source(self._relay_path, self._whep_url)
-                except RelayError as err:
-                    _LOGGER.warning("Oven camera: %s", err)
-                    return False
-                self._relay_source = self._whep_url
+            try:
+                await self._relay.async_set_source(self._relay_path, self._whep_url)
+            except RelayError as err:
+                _LOGGER.warning("Oven camera: %s", err)
+                return False
             return True
 
     async def _async_start_stream(self) -> str:
@@ -282,13 +279,10 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             _LOGGER.debug("Oven camera keepalive failed: %s", err)
             return
         self._whep_url = url
-        if self._relay_source != url:
-            try:
-                await self._relay.async_set_source(self._relay_path, url)
-            except RelayError as err:
-                _LOGGER.debug("Oven camera keepalive: %s", err)
-            else:
-                self._relay_source = url
+        try:
+            await self._relay.async_set_source(self._relay_path, url)
+        except RelayError as err:
+            _LOGGER.debug("Oven camera keepalive: %s", err)
 
     async def _async_stop_stream(self) -> None:
         """Stop the oven's live stream if this camera started it."""
