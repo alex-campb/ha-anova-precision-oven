@@ -1,5 +1,7 @@
 # Handoff: Anova Precision Oven v2 integration for Home Assistant
 
+> **Renamed (2026-10-19):** the integration's domain is now `anova_ovens` (display name "Anova Ovens", version 2.0.0) and the code lives in `custom_components/anova_ovens/`. Older notes below that mention `anova_precision_oven` (services, entity platform, config entry) describe the setup before the rename.
+
 ## Goal
 The user owns an **Anova Precision Oven v2** (`oven_v2`) and uses a custom Home Assistant integration: [wrongdoug/ha-anova-precision-oven](https://github.com/wrongdoug/ha-anova-precision-oven), v1.3.0, domain `anova_precision_oven`. The work so far:
 1. Fix the integration for v2 ovens without changing v1 behaviour (the user requires this).

@@ -2,7 +2,7 @@ import json, sys, types
 from datetime import datetime, timezone
 from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])  # custom_components dir
-from anova_precision_oven import coordinator as co, sensor, binary_sensor, climate
+from anova_ovens import coordinator as co, sensor, binary_sensor, climate
 state = json.load(open(sys.argv[2]))
 fake_now = datetime(2026, 10, 19, 2, 25, 38, tzinfo=timezone.utc)  # 180 s into timer
 with patch.object(co.dt_util, "utcnow", return_value=fake_now):

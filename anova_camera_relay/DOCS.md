@@ -10,7 +10,7 @@ the stream and re-serve it as RTSP for the integration.
 1. Install and start this app. It has no settings.
 2. Copy its hostname from the app's Info page (for example
    `abcd1234-anova-camera-relay`).
-3. In the Anova Precision Oven integration, open **Configure → Oven camera**
+3. In the Anova Ovens integration, open **Configure → Oven camera**
    and enter the hostname. The integration also needs the Anova app login.
 
 ## Resource use

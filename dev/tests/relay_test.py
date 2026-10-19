@@ -19,8 +19,8 @@ from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])
 import aiohttp
 
-from anova_precision_oven import camera
-from anova_precision_oven.relay import CameraRelay, RelayError, relay_host
+from anova_ovens import camera
+from anova_ovens.relay import CameraRelay, RelayError, relay_host
 
 logging.basicConfig(level=logging.WARNING, format="LOG %(levelname)s %(message)s")
 WHEP_URL = sys.argv[2]

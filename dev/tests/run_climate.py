@@ -2,7 +2,7 @@ import asyncio, json, sys, types
 from datetime import datetime, timezone
 from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])
-from anova_precision_oven import coordinator as co, climate, binary_sensor
+from anova_ovens import coordinator as co, climate, binary_sensor
 from homeassistant.components.climate import HVACMode
 
 state = json.load(open(sys.argv[2]))

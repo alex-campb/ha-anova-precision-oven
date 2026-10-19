@@ -2,8 +2,8 @@ import asyncio, json, sys, types
 from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, sys.argv[1])
 import websockets
-from anova_precision_oven import app_session as ap, coordinator as co, switch
-import anova_precision_oven as integ
+from anova_ovens import app_session as ap, coordinator as co, switch
+import anova_ovens as integ
 
 seen = {}
 async def server(ws):

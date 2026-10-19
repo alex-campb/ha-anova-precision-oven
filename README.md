@@ -1,6 +1,8 @@
-# Anova Precision Oven for Home Assistant
+# Anova Ovens for Home Assistant
 
-Home Assistant integration for the Anova Precision Oven (APO) using Anova's [official developer API](https://developer.anovaculinary.com/docs/devices/wifi/oven-commands). Real-time telemetry via WebSocket (`wss://devices.anovaculinary.io`), plus basic control.
+**Anova Ovens** (domain `anova_ovens`) is a Home Assistant integration for the Anova Precision Oven (APO) using Anova's [official developer API](https://developer.anovaculinary.com/docs/devices/wifi/oven-commands). Real-time telemetry via WebSocket (`wss://devices.anovaculinary.io`), plus basic control.
+
+Based on [wrongdoug/ha-anova-precision-oven](https://github.com/wrongdoug/ha-anova-precision-oven) v1.3.0 (MIT), extended with v2 oven support, lamp control, and the oven camera. It uses its own domain, so it is a separate integration from the original: install one or the other, not both.
 
 > **Provided as-is. No warranty. No expectation of maintenance, support, or future updates.** This is a personal project shared in case it's useful to someone else. You are responsible for verifying correct behavior -- particularly when automating against a physical cooking appliance.
 
@@ -10,8 +12,8 @@ Full read-only telemetry for the oven (22 sensors and binary sensors). Limited c
 
 ### Supported
 
-- Anova Precision Oven v1 (tested)
-- Anova Precision Oven v2 (untested; reads should work, the cook-start path sends extra fields the API docs suggest v2 requires)
+- Anova Precision Oven v1 (tested by the original author; behaviour unchanged from v1.3.0, checked against its outputs)
+- Anova Precision Oven v2 (tested on a v2 oven: sensors, cook start/stop, wet/dry presets, lamp, camera)
 
 ### Not Supported
 
@@ -108,16 +110,16 @@ Viewing the camera starts the oven's live stream over the app login (`CMD_APO_ST
 ### HACS
 
 1. In HACS, open the three-dot menu and select **Custom repositories**
-2. Add `https://github.com/wrongdoug/ha-anova-precision-oven` as an **Integration**
-3. Install "Anova Precision Oven" and restart HA
+2. Add `https://github.com/alex-campb/ha-anova-precision-oven` as an **Integration**
+3. Install "Anova Ovens" and restart HA
 
 ### Manual
 
-Copy `custom_components/anova_precision_oven/` into your HA config's `custom_components/` directory and restart.
+Copy `custom_components/anova_ovens/` into your HA config's `custom_components/` directory and restart.
 
 ## Configuration
 
-**Settings > Devices & Services > Add Integration > Anova Precision Oven**, then paste your Personal Access Token (starts with `anova-`).
+**Settings > Devices & Services > Add Integration > Anova Ovens**, then paste your Personal Access Token (starts with `anova-`).
 
 Tokens are documented in Anova's [authentication guide](https://developer.anovaculinary.com/docs/devices/wifi/authentication). Max 10 PATs per account. WebSocket connections time out after 30 minutes of inactivity; the integration auto-reconnects.
 

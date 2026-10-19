@@ -37,16 +37,16 @@ _LOGGER = logging.getLogger(__name__)
 _REDACTED = "[REDACTED]"
 
 _INTEGRATION_LOGGER_NAMES = (
-    "custom_components.anova_precision_oven",
-    "custom_components.anova_precision_oven.coordinator",
-    "custom_components.anova_precision_oven.config_flow",
-    "custom_components.anova_precision_oven.sensor",
-    "custom_components.anova_precision_oven.binary_sensor",
-    "custom_components.anova_precision_oven.climate",
-    "custom_components.anova_precision_oven.switch",
-    "custom_components.anova_precision_oven.camera",
-    "custom_components.anova_precision_oven.entity",
-    "custom_components.anova_precision_oven.diagnostics",
+    "custom_components.anova_ovens",
+    "custom_components.anova_ovens.coordinator",
+    "custom_components.anova_ovens.config_flow",
+    "custom_components.anova_ovens.sensor",
+    "custom_components.anova_ovens.binary_sensor",
+    "custom_components.anova_ovens.climate",
+    "custom_components.anova_ovens.switch",
+    "custom_components.anova_ovens.camera",
+    "custom_components.anova_ovens.entity",
+    "custom_components.anova_ovens.diagnostics",
 )
 
 

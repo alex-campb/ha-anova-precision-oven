@@ -1,6 +1,6 @@
 """Constants for the Anova Precision Oven integration."""
 
-DOMAIN = "anova_precision_oven"
+DOMAIN = "anova_ovens"
 
 CONF_TOKEN = "token"
 CONF_APP_EMAIL = "app_email"

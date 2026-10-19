@@ -125,7 +125,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaOvenConfigEntry) ->
     if hass.is_running:
         hass.async_create_background_task(
             coordinator.start_websocket(),
-            "anova_precision_oven_websocket",
+            "anova_ovens_websocket",
         )
     else:
         started = False
@@ -135,7 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaOvenConfigEntry) ->
             started = True
             hass.async_create_background_task(
                 coordinator.start_websocket(),
-                "anova_precision_oven_websocket",
+                "anova_ovens_websocket",
             )
 
         remove_listener = hass.bus.async_listen_once(

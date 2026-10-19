@@ -90,7 +90,7 @@ async def validate_token(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         _LOGGER.error("Unexpected error during validation: %s", type(err).__name__)
         raise CannotConnect(f"Unexpected error: {type(err).__name__}") from err
 
-    return {"title": "Anova Precision Oven"}
+    return {"title": "Anova Ovens"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):

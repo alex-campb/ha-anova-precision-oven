@@ -2,7 +2,7 @@
 import asyncio, copy, json, sys, types, uuid
 from unittest.mock import patch
 sys.path.insert(0, sys.argv[1])
-from anova_precision_oven import coordinator as co, sensor, binary_sensor, climate, switch
+from anova_ovens import coordinator as co, sensor, binary_sensor, climate, switch
 
 base = json.load(open(sys.argv[2]))
 out = {}

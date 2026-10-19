@@ -1,8 +1,8 @@
 import asyncio, json, sys, types
 sys.path.insert(0, sys.argv[1])
 from homeassistant.core import HomeAssistant, ServiceCall
-from anova_precision_oven import coordinator as co
-import anova_precision_oven as integ
+from anova_ovens import coordinator as co
+import anova_ovens as integ
 
 class FakeWS:
     """Replies to each command the way Anova's server does."""
@@ -23,7 +23,7 @@ async def main():
     entry = types.SimpleNamespace(runtime_data=types.SimpleNamespace(coordinator=c))
     hass = types.SimpleNamespace(config_entries=types.SimpleNamespace(async_loaded_entries=lambda d: [entry]))
     for cmd, payload in [("CMD_APO_SET_LAMP", {"on": True}), ("CMD_APO_START_LIVE_STREAM", None)]:
-        call = ServiceCall(hass, "anova_precision_oven", "send_command", integ.SEND_COMMAND_SCHEMA({"command": cmd, **({"payload": payload} if payload else {})}))
+        call = ServiceCall(hass, "anova_ovens", "send_command", integ.SEND_COMMAND_SCHEMA({"command": cmd, **({"payload": payload} if payload else {})}))
         print(cmd, "->", (await integ._async_send_command(call))["response"]["payload"])
     print("recorded:", [(r["command"], r["response"]["payload"]["status"]) for r in c.recent_responses])
     print("schema rejects non-oven command:", end=" ")
