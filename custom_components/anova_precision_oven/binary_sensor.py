@@ -75,6 +75,12 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[AnovaOvenBinarySensorDescription, ...] = (
         is_on_fn=lambda s: s.get("nodes", {}).get("vent", {}).get("open", False)
         or s.get("nodes", {}).get("exhaustVent", {}).get("state") == "open",
     ),
+    AnovaOvenBinarySensorDescription(
+        key="lamp",
+        name="Lamp",
+        device_class=BinarySensorDeviceClass.LIGHT,
+        is_on_fn=lambda s: s.get("nodes", {}).get("lamp", {}).get("on", False),
+    ),
 )
 
 

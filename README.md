@@ -6,7 +6,7 @@ Home Assistant integration for the Anova Precision Oven (APO) using Anova's [off
 
 ## Scope
 
-Full read-only telemetry for the oven (22 sensors and binary sensors). Limited control: on/off, target temperature, and the lamp. Complex cooking (multi-stage recipes, steam, custom heating element combinations, timer, fan/vent) should be driven from the Anova app. See [Climate Entity Behavior](#climate-entity-behavior) before automating against the climate entity.
+Full read-only telemetry for the oven (22 sensors and binary sensors). Limited control: on/off, target temperature, and dry (oven) or wet (sous vide) mode. The lamp is read-only because Anova's API has no lamp command. Complex cooking (multi-stage recipes, steam, custom heating element combinations, timer, fan/vent) should be driven from the Anova app. See [Climate Entity Behavior](#climate-entity-behavior) before automating against the climate entity.
 
 ### Supported
 
@@ -38,7 +38,7 @@ Anova Precision Cooker (APC sous vide circulator). That's a different product wi
 | Firmware / Hardware version | Diagnostic |
 | Cook session | Current cook session ID or `idle` |
 
-### Binary Sensors (4, read-only)
+### Binary Sensors (5, read-only)
 
 | Entity | Description |
 |---|---|
@@ -46,31 +46,31 @@ Anova Precision Cooker (APC sous vide circulator). That's a different product wi
 | Door | Open / closed |
 | Water tank | Empty (problem) + `descale_required` attribute |
 | Vent | Open / closed |
+| Lamp | On / off (cavity lamp) |
 
 ### Climate (1)
 
-`OFF` and `HEAT` HVAC modes, target temperature 25-250 C. See [Climate Entity Behavior](#climate-entity-behavior).
-
-### Switch (1)
-
-Lamp on/off.
+`OFF` and `HEAT` HVAC modes, target temperature 25-250 C (25-100 C in wet mode), and `dry` / `wet` presets. See [Climate Entity Behavior](#climate-entity-behavior).
 
 ## Climate Entity Behavior
 
-The climate entity is intentionally simple. Every `turn_on` or temperature change starts a **new single-stage cook** with these fixed parameters:
+The climate entity is intentionally simple.
 
-| Parameter | Value |
-|---|---|
-| Mode | Dry (no steam) |
-| Heating elements | Top on, Bottom off, Rear on |
-| Fan speed | 100% |
-| Humidity setpoint | 0% |
-| Vent | Closed |
-| Timer | None (indefinite) |
+**Oven idle:** `turn_on` starts a new single-stage cook with no timer, using the selected preset:
+
+| Parameter | `dry` preset | `wet` preset (sous vide) |
+|---|---|---|
+| Bulb | Dry | Wet |
+| Steam (relative humidity) | 0% | 100% |
+| Heating elements | Top + Rear | Top + Rear |
+| Fan speed | 100% | 100% |
+| Vent | Closed | Closed |
+
+**Oven cooking (v2 ovens):** changing the target temperature or preset resends the running cook from its active stage with only the bulb mode and setpoint changed. Steam, fan, heating elements, rack position and later stages are kept, and a running stage timer continues with the time it had left. Anova's personal-token API has no "adjust current cook" command, so the cook gets a new cook ID.
+
+**Oven cooking (v1 ovens):** a temperature change replaces the running cook with the simple cook above.
 
 `turn_off` sends `CMD_APO_STOP`.
-
-**Caveat:** if a multi-stage or steam cook is in progress (started from the Anova app), changing the HA climate target will **replace** it with the simple dry cook above. Anova's API has no "adjust current cook" command. Treat the climate entity as a "turn on to X" shortcut; use the app for structured recipes.
 
 ## Installation
 
