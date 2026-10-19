@@ -87,6 +87,12 @@ The user owns an **Anova Precision Oven v2** (`oven_v2`) and uses a custom Home 
   - **Conclusion:** HA's go2rtc can't play this camera. A fix needs a WebRTC client that can receive VP8.
   - **Option 1:** vendor aiortc 1.15 into the integration and test it against HA's `av` 19. aiortc pins `av<18`, so it can't go in `manifest.json` requirements. FFmpeg's native `vp8` decoder needs no libvpx.
   - **Option 2:** wait for go2rtc to add VP8, which would also need ffmpeg transcoding to H264 for RTSP and snapshots.
+- **WORKING PATH (verified 2026-10-19 on the user's PC): MediaMTX relay**
+  - **Relay:** MediaMTX v1.21.2, with `source: wheps://<webRTCPlayback URL without https://>`, connected to Cloudflare first time over host UDP. It reported `1 track (VP8)`, 600×950 at about 17 fps, and served it over RTSP. The tested config is `dev/relay/mediamtx.yml`, with localhost-only RTSP and everything else off.
+  - **Snapshot:** `ffmpeg -rtsp_transport tcp -i rtsp://<relay>:8554/oven -frames:v 1 -c:v mjpeg -f image2pipe pipe:1` returns a correct JPEG (ffmpeg has a native VP8 decoder).
+  - **Live view:** a go2rtc source `rtsp://…/oven` fails (`codecs not matched: video:VP8`). The source `ffmpeg:rtsp://…/oven#video=h264` works: H264 600×950, with a `frame.jpeg` in 2.3 seconds.
+  - **Proposed integration change (not done):** add an optional relay RTSP URL. With it, `stream_source()` returns `ffmpeg:<relay>#video=h264` for HA's go2rtc, and snapshots use ffmpeg straight from the relay. The integration keeps sending start and keep-alive commands. The WHEP URL is stable, so the relay config is static.
+  - **Deployment still to decide:** a MediaMTX add-on or container on the HA host, or another always-on machine. Its RTSP port must be reachable from HA.
 - **Start-command race:** right after restart, the camera's first `CMD_APO_START_LIVE_STREAM` over the app login returned `unauthorized`, and the same command succeeded a minute later. `AnovaAppSession` opens a fresh socket per command and sends at once, whereas the app waits for the socket to open and checks its queue again after 500 ms. Waiting for the first server event, or retrying once on `unauthorized`, would probably fix it. Not done yet.
 - **Temporary diagnostic code:** `camera.py` still contains `_async_go2rtc_stream_info` (reads go2rtc's stream status through HA's private `_rest_client`) and `_async_whep_probe` (posts a placeholder offer to Cloudflare and runs `ice_probe`). These and `ice_probe.py` should be removed once the camera is resolved.
 

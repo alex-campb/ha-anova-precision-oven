@@ -1,0 +1,18 @@
+# Test relay: pull the oven's Cloudflare WHEP stream, serve it as RTSP on localhost only
+logLevel: debug
+api: false
+metrics: false
+pprof: false
+playback: false
+rtsp: true
+rtspAddress: 127.0.0.1:8554
+rtspTransports: [tcp]
+rtmp: false
+hls: false
+webrtc: false
+srt: false
+moq: false
+paths:
+  oven:
+    source: wheps://<host from webRTCPlayback.url>/<stream id>/webRTC/play
+    sourceOnDemand: false
