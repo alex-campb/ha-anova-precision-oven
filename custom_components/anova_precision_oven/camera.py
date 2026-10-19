@@ -35,6 +35,9 @@ STREAM_KEEPALIVE = timedelta(seconds=50)
 STREAM_IDLE_STOP_SECONDS = 600
 # The oven's publisher needs a moment after a fresh start, or WHEP gets 409
 STREAM_WARMUP_SECONDS = 3
+# Returned while HA checks which provider can play this camera; only the
+# webrtc: scheme matters there, so the oven's stream is not started for it
+PROVIDER_PROBE_URL = "webrtc:https://anova.invalid/webRTC/play"
 
 
 async def async_setup_entry(
@@ -89,6 +92,7 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         self._whep_url: str | None = None
         self._last_requested = 0.0
         self._cancel_keepalive: Any = None
+        self._probing_providers = False
 
     @property
     def use_stream_for_stills(self) -> bool:
@@ -105,8 +109,24 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         """Explain why there is no picture when idle."""
         return {"streaming": self._whep_url is not None, "cooking": self._is_cooking}
 
+    async def async_refresh_providers(self, *, write_state: bool = True) -> None:
+        """Let HA link this camera to go2rtc without starting the oven stream.
+
+        HA picks the WebRTC provider once, when the entity is added, by
+        calling stream_source(). At that point the oven may not be cooking
+        (or its state not loaded yet), which would leave the camera without
+        go2rtc for good.
+        """
+        self._probing_providers = True
+        try:
+            await super().async_refresh_providers(write_state=write_state)
+        finally:
+            self._probing_providers = False
+
     async def stream_source(self) -> str | None:
         """Start (or keep) the oven's live stream and return it for go2rtc."""
+        if self._probing_providers:
+            return PROVIDER_PROBE_URL
         if not self._is_cooking:
             await self._async_stop_stream()
             return None
