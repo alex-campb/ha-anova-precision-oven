@@ -41,5 +41,8 @@ async def async_get_config_entry_diagnostics(
             "running": coordinator._running,
             "device_count": len(coordinator.devices),
             "devices": async_redact_data(coordinator.devices, TO_REDACT),
+            "recent_responses": async_redact_data(
+                list(coordinator.recent_responses), TO_REDACT
+            ),
         },
     }

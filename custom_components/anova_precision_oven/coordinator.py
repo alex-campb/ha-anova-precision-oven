@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from dataclasses import dataclass
 import json
 import logging
@@ -40,6 +41,7 @@ _INTEGRATION_LOGGER_NAMES = (
     "custom_components.anova_precision_oven.sensor",
     "custom_components.anova_precision_oven.binary_sensor",
     "custom_components.anova_precision_oven.climate",
+    "custom_components.anova_precision_oven.switch",
     "custom_components.anova_precision_oven.entity",
     "custom_components.anova_precision_oven.diagnostics",
 )
@@ -141,6 +143,10 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
         self._running = False
         self._listen_task = None
         self._ssl_context: ssl.SSLContext | None = None
+        # Server RESPONSE messages, keyed by the requestId we sent
+        self._pending: dict[str, asyncio.Future] = {}
+        self._sent_commands: dict[str, str] = {}
+        self.recent_responses: deque[dict[str, Any]] = deque(maxlen=20)
 
         self._log_filter = _TokenRedactFilter(token)
         for name in _INTEGRATION_LOGGER_NAMES:
@@ -312,6 +318,18 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
                 if devices:
                     self.async_set_updated_data(self.devices)
 
+            elif command == "RESPONSE":
+                request_id = data.get("requestId")
+                sent = self._sent_commands.pop(request_id, None)
+                self.recent_responses.append(
+                    {"command": sent, "requestId": request_id, "response": data}
+                )
+                if sent is not None:
+                    _LOGGER.debug("Response to %s: %s", sent, data.get("payload"))
+                future = self._pending.pop(request_id, None)
+                if future is not None and not future.done():
+                    future.set_result(data)
+
             elif command == EVENT_APO_STATE:
                 payload = data.get("payload", {})
                 if not isinstance(payload, dict):
@@ -352,8 +370,12 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Message handling error details", exc_info=True)
 
     async def send_command(
-        self, device_id: str, command: str, payload: dict[str, Any] | None = None
-    ) -> None:
+        self,
+        device_id: str,
+        command: str,
+        payload: dict[str, Any] | None = None,
+        request_id: str | None = None,
+    ) -> str:
         """Send a command to a device."""
         if not self.websocket:
             raise UpdateFailed("WebSocket not connected")
@@ -369,7 +391,7 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
 
         message = {
             "command": command,
-            "requestId": str(uuid.uuid4()),
+            "requestId": request_id or str(uuid.uuid4()),
             "payload": {
                 "id": device_id,
                 "type": command,
@@ -380,8 +402,12 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
             message["payload"]["payload"] = payload
 
         try:
+            self._sent_commands[message["requestId"]] = command
+            if len(self._sent_commands) > 50:
+                self._sent_commands.pop(next(iter(self._sent_commands)))
             await self.websocket.send(json.dumps(message))
             _LOGGER.debug("Sent command %s to device %s", command, device_id)
+            return message["requestId"]
         except WebSocketException as err:
             _LOGGER.error(
                 "Failed to send command %s: %s", command, type(err).__name__
@@ -398,6 +424,23 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(
                 f"Unexpected error: {type(err).__name__}"
             ) from err
+
+    async def send_command_and_wait(
+        self,
+        device_id: str,
+        command: str,
+        payload: dict[str, Any] | None = None,
+        timeout: float = 15,
+    ) -> dict[str, Any]:
+        """Send a command and return the server's RESPONSE message."""
+        request_id = str(uuid.uuid4())
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+        self._pending[request_id] = future
+        try:
+            await self.send_command(device_id, command, payload, request_id=request_id)
+            return await asyncio.wait_for(future, timeout)
+        finally:
+            self._pending.pop(request_id, None)
 
     def get_device_state(self, device_id: str) -> dict[str, Any] | None:
         """Get device state by ID."""

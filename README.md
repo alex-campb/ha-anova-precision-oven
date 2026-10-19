@@ -6,7 +6,7 @@ Home Assistant integration for the Anova Precision Oven (APO) using Anova's [off
 
 ## Scope
 
-Full read-only telemetry for the oven (22 sensors and binary sensors). Limited control: on/off, target temperature, and dry (oven) or wet (sous vide) mode. The lamp is read-only because Anova's API has no lamp command. Complex cooking (multi-stage recipes, steam, custom heating element combinations, timer, fan/vent) should be driven from the Anova app. See [Climate Entity Behavior](#climate-entity-behavior) before automating against the climate entity.
+Full read-only telemetry for the oven (22 sensors and binary sensors). Limited control: on/off, target temperature, dry (oven) or wet (sous vide) mode on v2 ovens, and the lamp. Complex cooking (multi-stage recipes, steam, custom heating element combinations, timer, fan/vent) should be driven from the Anova app. See [Climate Entity Behavior](#climate-entity-behavior) before automating against the climate entity.
 
 ### Supported
 
@@ -38,7 +38,7 @@ Anova Precision Cooker (APC sous vide circulator). That's a different product wi
 | Firmware / Hardware version | Diagnostic |
 | Cook session | Current cook session ID or `idle` |
 
-### Binary Sensors (5, read-only)
+### Binary Sensors (4, read-only)
 
 | Entity | Description |
 |---|---|
@@ -46,11 +46,14 @@ Anova Precision Cooker (APC sous vide circulator). That's a different product wi
 | Door | Open / closed |
 | Water tank | Empty (problem) + `descale_required` attribute |
 | Vent | Open / closed |
-| Lamp | On / off (cavity lamp) |
 
 ### Climate (1)
 
-`OFF` and `HEAT` HVAC modes, target temperature 25-250 C (25-100 C in wet mode), and `dry` / `wet` presets. See [Climate Entity Behavior](#climate-entity-behavior).
+`OFF` and `HEAT` HVAC modes, target temperature 25-250 C (25-100 C in wet mode), and `dry` / `wet` presets on v2 ovens. See [Climate Entity Behavior](#climate-entity-behavior).
+
+### Switch (1)
+
+Lamp on/off.
 
 ## Climate Entity Behavior
 

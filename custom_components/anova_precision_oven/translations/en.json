@@ -17,5 +17,25 @@
     "abort": {
       "already_configured": "Device is already configured"
     }
+  },
+  "services": {
+    "send_command": {
+      "name": "Send raw command",
+      "description": "Advanced: send a CMD_APO_* command to the oven and return Anova's reply. Intended for testing undocumented commands; it can start or stop cooks.",
+      "fields": {
+        "command": {
+          "name": "Command",
+          "description": "Command name, e.g. CMD_APO_STOP."
+        },
+        "payload": {
+          "name": "Payload",
+          "description": "Inner command payload, if the command takes one."
+        },
+        "cooker_id": {
+          "name": "Cooker ID",
+          "description": "Only needed when more than one oven is set up."
+        }
+      }
+    }
   }
 }

@@ -159,10 +159,10 @@ SENSOR_DESCRIPTIONS: tuple[AnovaOvenSensorDescription, ...] = (
         name="Dry temperature setpoint",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        available_fn=lambda s: _get_nested(
-            s, "nodes", "temperatureBulbs", "mode"
-        )
-        != "wet",
+        available_fn=lambda s: not (
+            s.get("version") == 2
+            and _get_nested(s, "nodes", "temperatureBulbs", "mode") == "wet"
+        ),
         value_fn=lambda s: _get_nested(
             s, "nodes", "temperatureBulbs", "dry", "setpoint", "celsius"
         ),
@@ -208,7 +208,11 @@ SENSOR_DESCRIPTIONS: tuple[AnovaOvenSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda s: _fan_speed_value(s),
-        extra_attrs_fn=lambda s: {"level": _get_nested(s, "nodes", "fan", "speed")},
+        extra_attrs_fn=lambda s: (
+            {"level": _get_nested(s, "nodes", "fan", "speed")}
+            if s.get("version") == 2
+            else {}
+        ),
     ),
     AnovaOvenSensorDescription(
         key="rack_position",

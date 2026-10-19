@@ -81,10 +81,8 @@ class AnovaOvenClimate(AnovaOvenEntity, ClimateEntity):
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
-        | ClimateEntityFeature.PRESET_MODE
     )
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
-    _attr_preset_modes = [PRESET_DRY, PRESET_WET]
     _attr_min_temp = TEMP_MIN_CELSIUS
     _attr_target_temperature_step = 1
 
@@ -125,8 +123,23 @@ class AnovaOvenClimate(AnovaOvenEntity, ClimateEntity):
         return HVACAction.OFF
 
     @property
-    def preset_mode(self) -> str:
+    def supported_features(self) -> ClimateEntityFeature:
+        """Return supported features; dry/wet presets are v2 only."""
+        features = self._attr_supported_features
+        if self._is_v2:
+            features |= ClimateEntityFeature.PRESET_MODE
+        return features
+
+    @property
+    def preset_modes(self) -> list[str] | None:
+        """Return available presets (v2 only)."""
+        return [PRESET_DRY, PRESET_WET] if self._is_v2 else None
+
+    @property
+    def preset_mode(self) -> str | None:
         """Return dry (oven) or wet (sous vide) bulb mode."""
+        if not self._is_v2:
+            return None
         if self.hvac_mode == HVACMode.OFF:
             return self._idle_preset
         state = self.coordinator.get_device_state(self._device_id) or {}
@@ -147,7 +160,8 @@ class AnovaOvenClimate(AnovaOvenEntity, ClimateEntity):
             return {}
 
         bulbs = state.get("nodes", {}).get("temperatureBulbs", {})
-        mode = "wet" if bulbs.get("mode") == "wet" else "dry"
+        # v1 behaviour is unchanged: always report the dry bulb
+        mode = "wet" if self._is_v2 and bulbs.get("mode") == "wet" else "dry"
         return bulbs.get(mode, {})
 
     @property
@@ -213,13 +227,13 @@ class AnovaOvenClimate(AnovaOvenEntity, ClimateEntity):
             return
 
         if self.hvac_mode == HVACMode.HEAT:
-            await self._async_start_cook(temperature, self.preset_mode)
+            await self._async_start_cook(temperature, self.preset_mode or PRESET_DRY)
         else:
             _LOGGER.warning("Cannot set temperature when oven is off")
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Switch between dry (oven) and wet (sous vide) bulb mode."""
-        if preset_mode not in self._attr_preset_modes:
+        if preset_mode not in (self.preset_modes or []):
             _LOGGER.error("Unknown preset mode: %s", preset_mode)
             return
 
