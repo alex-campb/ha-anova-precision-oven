@@ -1,34 +1,39 @@
 """Camera platform for Anova Precision Oven (v2, via the app login).
 
 The oven only streams while cooking. Starting its live stream over the app
-login returns a Cloudflare WebRTC (WHEP) playback URL; Home Assistant's
-built-in go2rtc plays that URL for live view. The SRT URL it also
-returns carries no video for the oven's stream, so it is not used.
+login returns a Cloudflare WebRTC (WHEP) playback URL. (The SRT URL it also
+returns carries no video for the oven's stream, so it is not used.)
 
-Snapshots: HA allows a snapshot 10 seconds, and opening the WebRTC
-connection and waiting for a key frame can take longer. Frames are
-therefore grabbed in the background (via go2rtc's snapshot API, falling
-back to ffmpeg reading go2rtc's local RTSP restream with a longer
-timeout) and a request returns the latest frame. Failures are logged.
+Snapshots: frames are read from the WHEP URL directly with aiortc (see
+whep.py), in the background because the WebRTC setup can take longer than
+the 10 seconds HA allows a snapshot; a request returns the latest frame.
+aiortc is installed when the camera is set up, so only v2 ovens with the
+app login need it, and if it cannot be installed only snapshots are lost.
+
+Live view: the same URL is handed to HA's built-in go2rtc.
+
 The stream is kept alive while requested and stopped when it is not.
 """
 from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+import importlib
 import logging
 import time
 from typing import Any
 
 from homeassistant.components.camera import Camera, CameraEntityFeature
-from homeassistant.components.ffmpeg import get_ffmpeg_manager
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.requirements import async_process_requirements
 
-from .const import OVEN_TYPE_V2
+from .const import DOMAIN, OVEN_TYPE_V2
 from .coordinator import AnovaOvenConfigEntry, AnovaOvenCoordinator
 from .entity import AnovaOvenEntity
+from .whep import async_grab_jpeg
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,10 +49,9 @@ STREAM_WARMUP_SECONDS = 3
 # Returned while HA checks which provider can play this camera; only the
 # webrtc: scheme matters there, so the oven's stream is not started for it
 PROVIDER_PROBE_URL = "webrtc:https://anova.invalid/webRTC/play"
-# go2rtc as run by Home Assistant restreams every camera over local RTSP,
-# named after the camera's entity_id
-GO2RTC_RTSP_URL = "rtsp://127.0.0.1:18554/{entity_id}"
-# How long a background ffmpeg grab may take
+# Installed on demand by the camera platform (compatible with HA's av pin)
+AIORTC_REQUIREMENT = "aiortc==1.15.0"
+# How long one background WebRTC frame grab may take
 FRAME_GRAB_TIMEOUT_SECONDS = 30
 # How long a snapshot request waits for a grab before returning the last frame
 SNAPSHOT_WAIT_SECONDS = 8
@@ -63,6 +67,22 @@ async def async_setup_entry(
     if coordinator.app_session is None:
         return
 
+    aiortc = None
+    try:
+        await async_process_requirements(
+            hass, f"{DOMAIN}.camera", [AIORTC_REQUIREMENT], is_built_in=False
+        )
+        aiortc = await hass.async_add_import_executor_job(
+            importlib.import_module, "aiortc"
+        )
+    except Exception as err:
+        _LOGGER.warning(
+            "Oven camera snapshots are unavailable because %s could not be "
+            "installed: %s",
+            AIORTC_REQUIREMENT,
+            err,
+        )
+
     known_devices: set[str] = set()
 
     def create_entities_for_device(device_id: str) -> None:
@@ -71,7 +91,7 @@ async def async_setup_entry(
             return
 
         known_devices.add(device_id)
-        async_add_entities([AnovaOvenCamera(coordinator, device_id)])
+        async_add_entities([AnovaOvenCamera(coordinator, device_id, aiortc)])
         _LOGGER.debug("Created camera entity for device %s", device_id)
 
     for device_id in coordinator.devices:
@@ -86,7 +106,7 @@ async def async_setup_entry(
 
 
 class AnovaOvenCamera(AnovaOvenEntity, Camera):
-    """Live view and snapshots of the oven cavity, played by go2rtc."""
+    """Snapshots (aiortc) and live view (go2rtc) of the oven cavity."""
 
     _attr_supported_features = CameraEntityFeature.STREAM
 
@@ -94,6 +114,7 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         self,
         coordinator: AnovaOvenCoordinator,
         device_id: str,
+        aiortc: Any,
     ) -> None:
         """Initialize the camera."""
         AnovaOvenEntity.__init__(self, coordinator, device_id)
@@ -107,6 +128,7 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         self._cancel_keepalive: Any = None
         self._probing_providers = False
         self._grab_task: asyncio.Task | None = None
+        self._aiortc = aiortc
         self._last_image: bytes | None = None
 
     async def async_camera_image(
@@ -127,67 +149,34 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         return self._last_image
 
     async def _async_grab_frame(self) -> None:
-        """Grab a frame through go2rtc, logging why if none arrives."""
-        provider = self._webrtc_provider
-        if provider is None:
-            _LOGGER.warning(
-                "Oven camera snapshots need Home Assistant's go2rtc, which is not available"
-            )
+        """Read one frame from the oven's WHEP stream, logging failures."""
+        if self._aiortc is None:
             return
 
         started = time.monotonic()
-        # Also registers the stream with go2rtc
-        go2rtc_error = "returned no image"
         try:
-            image = await provider.async_get_image(self)
-        except Exception as err:
-            go2rtc_error = repr(err)
-            image = None
-        if image:
-            self._last_image = image
-            _LOGGER.debug("go2rtc snapshot took %.1fs", time.monotonic() - started)
-            return
-
-        proc = await asyncio.create_subprocess_exec(
-            get_ffmpeg_manager(self.hass).binary,
-            "-hide_banner",
-            "-loglevel",
-            "warning",
-            "-rtsp_transport",
-            "tcp",
-            "-i",
-            GO2RTC_RTSP_URL.format(entity_id=self.entity_id),
-            "-frames:v",
-            "1",
-            "-c:v",
-            "mjpeg",
-            "-f",
-            "image2pipe",
-            "pipe:1",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), FRAME_GRAB_TIMEOUT_SECONDS
+            whep_url = await self._async_ensure_stream()
+            if whep_url is None:
+                return
+            image = await async_grab_jpeg(
+                self._aiortc,
+                async_get_clientsession(self.hass),
+                whep_url,
+                FRAME_GRAB_TIMEOUT_SECONDS,
             )
-        except TimeoutError:
-            proc.kill()
-            stdout, stderr = await proc.communicate()
-            stderr += b"\n(timed out waiting for a frame)"
-
-        elapsed = time.monotonic() - started
-        if stdout:
-            self._last_image = stdout
-            _LOGGER.debug("Oven camera frame via go2rtc RTSP took %.1fs", elapsed)
+        except Exception as err:  # WhepError, network or stream start errors
+            _LOGGER.warning(
+                "No frame from the oven camera after %.0fs: %s",
+                time.monotonic() - started,
+                err,
+            )
             return
-        _LOGGER.warning(
-            "No frame from the oven camera after %.0fs; go2rtc snapshot %s; "
-            "ffmpeg via go2rtc RTSP exit %s: %s",
-            elapsed,
-            go2rtc_error,
-            proc.returncode,
-            stderr.decode(errors="replace").strip()[-1500:] or "no output",
+
+        self._last_image = image
+        _LOGGER.debug(
+            "Oven camera frame took %.1fs (%d bytes)",
+            time.monotonic() - started,
+            len(image),
         )
 
     @property
@@ -218,6 +207,11 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         """Start (or keep) the oven's live stream and return it for go2rtc."""
         if self._probing_providers:
             return PROVIDER_PROBE_URL
+        whep_url = await self._async_ensure_stream()
+        return f"webrtc:{whep_url}" if whep_url else None
+
+    async def _async_ensure_stream(self) -> str | None:
+        """Start (or keep) the oven's live stream; return its WHEP URL."""
         if not self._is_cooking:
             await self._async_stop_stream()
             return None
@@ -232,7 +226,7 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
                     return None
                 self._start_keepalive()
                 await asyncio.sleep(STREAM_WARMUP_SECONDS)
-            return f"webrtc:{self._whep_url}"
+            return self._whep_url
 
     async def _async_start_stream(self) -> str:
         """Send the live-stream start command and return the WHEP URL."""
