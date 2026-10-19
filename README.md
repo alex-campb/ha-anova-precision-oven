@@ -84,6 +84,12 @@ Anova refuses the lamp command (`unauthorized`) when it is sent with a Personal 
 - This uses the app's unofficial protocol and may stop working if Anova changes its app. Everything else in the integration is unaffected.
 - To remove the login, open **Configure** and clear the email.
 
+### Camera (v2 ovens, with the app login)
+
+With the app login configured, v2 ovens get a **Camera** entity with snapshots of the oven cavity. The oven only streams while cooking; when it is not cooking the camera shows the last picture taken.
+
+A snapshot starts the oven's live stream over the app login (`CMD_APO_START_LIVE_STREAM`), grabs one frame from its SRT feed with Home Assistant's ffmpeg, keeps the stream alive while snapshots keep being requested, and stops it (`CMD_APO_STOP_LIVE_STREAM`) after 60 seconds without one. Anova may require a subscription for the camera.
+
 ## Installation
 
 ### HACS

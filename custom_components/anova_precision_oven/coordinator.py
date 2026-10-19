@@ -44,6 +44,7 @@ _INTEGRATION_LOGGER_NAMES = (
     "custom_components.anova_precision_oven.binary_sensor",
     "custom_components.anova_precision_oven.climate",
     "custom_components.anova_precision_oven.switch",
+    "custom_components.anova_precision_oven.camera",
     "custom_components.anova_precision_oven.entity",
     "custom_components.anova_precision_oven.diagnostics",
 )

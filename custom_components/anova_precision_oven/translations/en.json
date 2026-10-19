@@ -48,7 +48,7 @@
     "step": {
       "init": {
         "title": "Anova app login (optional)",
-        "description": "Your Personal Access Token is not allowed to control the lamp. Signing in with your Anova app email and password lets Home Assistant send lamp commands the way the app does.\n\nThis needs an email and password login. If you sign in to Anova with Google, Facebook or Apple, first set a password on the [Anova password reset page](https://anovaculinary.io/ali/password-reset) using your account's email, then enter it here.\n\nYour password is not stored. This is unofficial and may stop working if Anova changes its app. Leave the email empty to remove the login.",
+        "description": "Your Personal Access Token is not allowed to control the lamp or the oven camera. Signing in with your Anova app email and password lets Home Assistant control the lamp and take camera snapshots (v2 ovens, while cooking) the way the app does.\n\nThis needs an email and password login. If you sign in to Anova with Google, Facebook or Apple, first set a password on the [Anova password reset page](https://anovaculinary.io/ali/password-reset) using your account's email, then enter it here.\n\nYour password is not stored. This is unofficial and may stop working if Anova changes its app. Leave the email empty to remove the login.",
         "data": {
           "app_email": "Anova email",
           "app_password": "Anova password"
