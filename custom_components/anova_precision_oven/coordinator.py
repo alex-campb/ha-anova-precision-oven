@@ -464,7 +464,12 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
         self.recent_responses.append(
             {"command": command, "via": "app", "response": response}
         )
-        _LOGGER.debug("App response to %s: %s", command, response.get("payload"))
+        # Only the status: live-stream replies carry playback credentials
+        _LOGGER.debug(
+            "App response to %s: %s",
+            command,
+            {k: v for k, v in (response.get("payload") or {}).items() if k != "data"},
+        )
         return response
 
     def get_device_state(self, device_id: str) -> dict[str, Any] | None:

@@ -59,6 +59,10 @@ GO2RTC_RTSP_URL = "rtsp://127.0.0.1:18554/{name}"
 FRAME_GRAB_TIMEOUT_SECONDS = 30
 # How long a snapshot request waits for a grab before returning the last frame
 SNAPSHOT_WAIT_SECONDS = 8
+# Hard limits so a stuck step cannot block all later snapshots
+GO2RTC_SNAPSHOT_TIMEOUT_SECONDS = 15
+GO2RTC_INFO_TIMEOUT_SECONDS = 10
+GRAB_TOTAL_TIMEOUT_SECONDS = 60
 
 
 async def async_setup_entry(
@@ -154,6 +158,7 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
         self._cancel_keepalive: Any = None
         self._probing_providers = False
         self._grab_task: asyncio.Task | None = None
+        self._grab_step = ""
         self._last_image: bytes | None = None
 
     async def async_camera_image(
@@ -165,13 +170,28 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
 
         if self._grab_task is None or self._grab_task.done():
             self._grab_task = self.hass.async_create_background_task(
-                self._async_grab_frame(), f"{self.entity_id} frame grab"
+                self._async_grab_frame_limited(), f"{self.entity_id} frame grab"
             )
         try:
             await asyncio.wait_for(asyncio.shield(self._grab_task), SNAPSHOT_WAIT_SECONDS)
         except TimeoutError:
             pass
         return self._last_image
+
+    async def _async_grab_frame_limited(self) -> None:
+        """Run one grab with an overall limit, logging the step it stopped at."""
+        self._grab_step = "starting"
+        try:
+            async with asyncio.timeout(GRAB_TOTAL_TIMEOUT_SECONDS):
+                await self._async_grab_frame()
+        except TimeoutError:
+            _LOGGER.warning(
+                "Oven camera frame grab stopped after %ss during: %s",
+                GRAB_TOTAL_TIMEOUT_SECONDS,
+                self._grab_step,
+            )
+        except Exception:
+            _LOGGER.exception("Oven camera frame grab failed during: %s", self._grab_step)
 
     async def _async_grab_frame(self) -> None:
         """Grab a frame through go2rtc, logging why if none arrives."""
@@ -183,10 +203,13 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             return
 
         started = time.monotonic()
-        # Also registers the stream with go2rtc (limited to 10 s by HA)
+        # Also registers the stream with go2rtc
+        self._grab_step = "go2rtc snapshot"
+        _LOGGER.debug("Oven camera grab: go2rtc snapshot")
         go2rtc_error = "returned no image"
         try:
-            image = await provider.async_get_image(self)
+            async with asyncio.timeout(GO2RTC_SNAPSHOT_TIMEOUT_SECONDS):
+                image = await provider.async_get_image(self)
         except Exception as err:
             go2rtc_error = repr(err)
             image = None
@@ -195,6 +218,8 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             _LOGGER.debug("go2rtc snapshot took %.1fs", time.monotonic() - started)
             return
 
+        self._grab_step = f"ffmpeg via go2rtc RTSP (go2rtc snapshot {go2rtc_error})"
+        _LOGGER.debug("Oven camera grab: %s", self._grab_step)
         proc = await asyncio.create_subprocess_exec(
             get_ffmpeg_manager(self.hass).binary,
             "-hide_banner",
@@ -220,7 +245,11 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             # Read go2rtc's view of the stream while ffmpeg is still attached
             done, _ = await asyncio.wait({communicate}, timeout=FRAME_GRAB_TIMEOUT_SECONDS / 2)
             if not done:
-                go2rtc_info = await _async_go2rtc_stream_info(provider, self)
+                try:
+                    async with asyncio.timeout(GO2RTC_INFO_TIMEOUT_SECONDS):
+                        go2rtc_info = await _async_go2rtc_stream_info(provider, self)
+                except TimeoutError:
+                    go2rtc_info = "no reply from go2rtc"
             stdout, stderr = await asyncio.wait_for(
                 communicate, FRAME_GRAB_TIMEOUT_SECONDS / 2
             )
