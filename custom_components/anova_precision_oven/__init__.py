@@ -11,6 +11,7 @@ from homeassistant.core import (
     ServiceCall,
     ServiceResponse,
     SupportsResponse,
+    callback,
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
@@ -127,15 +128,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaOvenConfigEntry) ->
             "anova_precision_oven_websocket",
         )
     else:
+        started = False
+
         async def _start_websocket(_event):
+            nonlocal started
+            started = True
             hass.async_create_background_task(
                 coordinator.start_websocket(),
                 "anova_precision_oven_websocket",
             )
 
-        entry.async_on_unload(
-            hass.bus.async_listen_once("homeassistant_started", _start_websocket)
+        remove_listener = hass.bus.async_listen_once(
+            "homeassistant_started", _start_websocket
         )
+
+        @callback
+        def _remove_start_listener() -> None:
+            # A one-time listener that already ran cannot be removed again
+            if not started:
+                remove_listener()
+
+        entry.async_on_unload(_remove_start_listener)
 
     return True
 
