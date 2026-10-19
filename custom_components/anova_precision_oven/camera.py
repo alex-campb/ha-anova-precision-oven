@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 import logging
+import re
 import time
 from typing import Any
 
@@ -97,6 +98,38 @@ def _go2rtc_stream_name(camera: Camera) -> str:
     if get_camera_identifier is None:
         return camera.entity_id
     return get_camera_identifier(camera)
+
+
+async def _async_go2rtc_stream_info(provider: Any, camera: Camera) -> str:
+    """Summarise go2rtc's connections for this stream (diagnostics only).
+
+    Uses go2rtc's /api/streams through HA's client internals, so any error
+    just yields a note instead of failing the snapshot.
+    """
+    try:
+        resp = await provider._rest_client.streams._client.request(  # noqa: SLF001
+            "GET", "/api/streams", params={"src": _go2rtc_stream_name(camera)}
+        )
+        info = await resp.json()
+    except Exception as err:
+        return f"unavailable ({err!r})"
+
+    parts = []
+    for prod in info.get("producers") or []:
+        sdp = prod.get("sdp") or ""
+        # Media sections of the WHEP answer: kind, port (0 = rejected), codecs
+        answer = []
+        for section in re.split(r"(?m)^(?=m=)", sdp)[1:]:
+            kind, port = section.split()[0][2:], section.split()[1]
+            codecs = sorted(set(re.findall(r"a=rtpmap:\d+ ([^/]+)/", section)))
+            answer.append(f"{kind}:{port}:{'/'.join(codecs)}")
+        parts.append(
+            f"[{prod.get('format_name')}/{prod.get('protocol')} "
+            f"remote={prod.get('remote_addr')} recv={prod.get('bytes_recv', 0)}B "
+            f"medias={prod.get('medias')} answer={answer}]"
+        )
+    consumers = len(info.get("consumers") or [])
+    return f"{len(parts)} producer(s) {' '.join(parts)}; {consumers} consumer(s)"
 
 
 class AnovaOvenCamera(AnovaOvenEntity, Camera):
@@ -181,13 +214,19 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        communicate = asyncio.ensure_future(proc.communicate())
+        go2rtc_info = "not read"
         try:
+            # Read go2rtc's view of the stream while ffmpeg is still attached
+            done, _ = await asyncio.wait({communicate}, timeout=FRAME_GRAB_TIMEOUT_SECONDS / 2)
+            if not done:
+                go2rtc_info = await _async_go2rtc_stream_info(provider, self)
             stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), FRAME_GRAB_TIMEOUT_SECONDS
+                communicate, FRAME_GRAB_TIMEOUT_SECONDS / 2
             )
         except TimeoutError:
             proc.kill()
-            stdout, stderr = await proc.communicate()
+            stdout, stderr = await communicate
             stderr += b"\n(timed out waiting for a frame)"
 
         elapsed = time.monotonic() - started
@@ -197,11 +236,12 @@ class AnovaOvenCamera(AnovaOvenEntity, Camera):
             return
         _LOGGER.warning(
             "No frame from the oven camera after %.0fs; go2rtc snapshot %s; "
-            "ffmpeg via go2rtc RTSP exit %s: %s",
+            "ffmpeg via go2rtc RTSP exit %s: %s; go2rtc stream: %s",
             elapsed,
             go2rtc_error,
             proc.returncode,
             stderr.decode(errors="replace").strip()[-1500:] or "no output",
+            go2rtc_info,
         )
 
     @property
