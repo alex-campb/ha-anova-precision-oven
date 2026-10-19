@@ -159,6 +159,10 @@ SENSOR_DESCRIPTIONS: tuple[AnovaOvenSensorDescription, ...] = (
         name="Dry temperature setpoint",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        available_fn=lambda s: _get_nested(
+            s, "nodes", "temperatureBulbs", "mode"
+        )
+        != "wet",
         value_fn=lambda s: _get_nested(
             s, "nodes", "temperatureBulbs", "dry", "setpoint", "celsius"
         ),
@@ -203,7 +207,8 @@ SENSOR_DESCRIPTIONS: tuple[AnovaOvenSensorDescription, ...] = (
         icon="mdi:fan",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda s: _get_nested(s, "nodes", "fan", "speed"),
+        value_fn=lambda s: _fan_speed_value(s),
+        extra_attrs_fn=lambda s: {"level": _get_nested(s, "nodes", "fan", "speed")},
     ),
     AnovaOvenSensorDescription(
         key="rack_position",
@@ -280,6 +285,27 @@ SENSOR_DESCRIPTIONS: tuple[AnovaOvenSensorDescription, ...] = (
         },
     ),
 )
+
+
+def _fan_speed_value(state: dict[str, Any]) -> int | None:
+    """Return fan speed as a percentage.
+
+    v1 reports a number; v2 reports a level ("off", "max", ...), so use the
+    active stage's requested speed when the oven is cooking.
+    """
+    speed = _get_nested(state, "nodes", "fan", "speed")
+    if isinstance(speed, (int, float)):
+        return speed
+    if speed == "off":
+        return 0
+
+    stage_id = _get_nested(state, "cook", "activeStageId")
+    for stage in _get_nested(state, "cook", "stages", default=[]):
+        if isinstance(stage, dict) and stage.get("id") == stage_id:
+            stage_speed = _get_nested(stage, "do", "fan", "speed")
+            if isinstance(stage_speed, (int, float)):
+                return stage_speed
+    return None
 
 
 def _heating_elements_value(state: dict[str, Any]) -> str | None:

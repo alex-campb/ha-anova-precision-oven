@@ -16,12 +16,14 @@ from websockets.exceptions import WebSocketException
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     ACCESSORIES_APO,
     DOMAIN,
     EVENT_APO_STATE,
     EVENT_APO_WIFI_LIST,
+    OVEN_TYPE_V2,
     WS_ENDPOINT,
     WS_MAX_MESSAGE_SIZE,
     WS_RECONNECT_DELAY,
@@ -72,6 +74,52 @@ class _TokenRedactFilter(logging.Filter):
         except Exception:
             pass
         return True
+
+
+def _add_fahrenheit(node: Any) -> None:
+    """Fill in fahrenheit next to every celsius value (v2 reports celsius only)."""
+    if isinstance(node, dict):
+        celsius = node.get("celsius")
+        if isinstance(celsius, (int, float)) and "fahrenheit" not in node:
+            node["fahrenheit"] = round(celsius * 9 / 5 + 32, 1)
+        for value in node.values():
+            _add_fahrenheit(value)
+    elif isinstance(node, list):
+        for value in node:
+            _add_fahrenheit(value)
+
+
+def _normalize_v2_state(state: dict[str, Any]) -> None:
+    """Map an oven_v2 state onto the v1 field layout the entities read."""
+    nodes = state.get("nodes")
+    if isinstance(nodes, dict):
+        _add_fahrenheit(nodes.get("temperatureBulbs"))
+        _add_fahrenheit(nodes.get("temperatureProbe"))
+
+        # v2 has cavityLamp/doorLamp instead of lamp
+        if "lamp" not in nodes and isinstance(nodes.get("cavityLamp"), dict):
+            nodes["lamp"] = nodes["cavityLamp"]
+
+        # v2 timer reports a start time instead of a running count
+        timer = nodes.get("timer")
+        if isinstance(timer, dict) and "current" not in timer:
+            initial = timer.get("initial")
+            started = dt_util.parse_datetime(timer.get("startedAtTimestamp") or "")
+            if timer.get("mode") == "running" and isinstance(initial, int) and started:
+                elapsed = (dt_util.utcnow() - started).total_seconds()
+                timer["current"] = max(0, int(elapsed))
+            elif timer.get("mode") == "completed" and isinstance(initial, int):
+                timer["current"] = initial
+            elif timer.get("mode") == "idle":
+                timer["current"] = 0
+
+    # v2 nests the active cook under "cook"
+    cook = state.get("cook")
+    if isinstance(cook, dict):
+        _add_fahrenheit(cook.get("stages"))
+        for key in ("cookId", "originSource", "rackPosition", "stages"):
+            if key in cook and key not in state:
+                state[key] = cook[key]
 
 
 class AnovaOvenCoordinator(DataUpdateCoordinator):
@@ -289,6 +337,9 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
                 if not isinstance(actual_state, dict):
                     _LOGGER.warning("Invalid state format for device %s", device_id)
                     return
+
+                if payload.get("type") == OVEN_TYPE_V2 or actual_state.get("version") == 2:
+                    _normalize_v2_state(actual_state)
 
                 self.devices[device_id]["state"] = actual_state
                 self.async_set_updated_data(self.devices)

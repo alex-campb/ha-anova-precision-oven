@@ -115,35 +115,25 @@ class AnovaOvenClimate(AnovaOvenEntity, ClimateEntity):
             return HVACAction.HEATING
         return HVACAction.OFF
 
+    def _active_bulb(self) -> dict[str, Any]:
+        """Return the temperature bulb (dry or wet) the oven is controlling."""
+        state = self.coordinator.get_device_state(self._device_id)
+        if not state:
+            return {}
+
+        bulbs = state.get("nodes", {}).get("temperatureBulbs", {})
+        mode = "wet" if bulbs.get("mode") == "wet" else "dry"
+        return bulbs.get(mode, {})
+
     @property
     def current_temperature(self) -> float | None:
         """Return the current temperature."""
-        state = self.coordinator.get_device_state(self._device_id)
-        if not state:
-            return None
-
-        return (
-            state.get("nodes", {})
-            .get("temperatureBulbs", {})
-            .get("dry", {})
-            .get("current", {})
-            .get("celsius")
-        )
+        return self._active_bulb().get("current", {}).get("celsius")
 
     @property
     def target_temperature(self) -> float | None:
         """Return the target temperature."""
-        state = self.coordinator.get_device_state(self._device_id)
-        if not state:
-            return None
-
-        return (
-            state.get("nodes", {})
-            .get("temperatureBulbs", {})
-            .get("dry", {})
-            .get("setpoint", {})
-            .get("celsius")
-        )
+        return self._active_bulb().get("setpoint", {}).get("celsius")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
