@@ -12,7 +12,9 @@
     "error": {
       "invalid_token": "Invalid token format. Token must start with 'anova-'",
       "cannot_connect": "Failed to connect to Anova API",
-      "unknown": "Unexpected error occurred"
+      "unknown": "Unexpected error occurred",
+      "app_invalid_auth": "Anova rejected the email or password",
+      "app_password_required": "Enter your Anova password"
     },
     "abort": {
       "already_configured": "Device is already configured"
@@ -34,8 +36,29 @@
         "cooker_id": {
           "name": "Cooker ID",
           "description": "Only needed when more than one oven is set up."
+        },
+        "use_app_login": {
+          "name": "Use app login",
+          "description": "Send over the Anova app login instead of the Personal Access Token."
         }
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Anova app login (optional)",
+        "description": "Your Personal Access Token is not allowed to control the lamp. Signing in with your Anova app email and password lets Home Assistant send lamp commands the way the app does. Only works for email/password accounts (not Apple or Google sign-in). Unofficial: it may stop working if Anova changes its app. Your password is not stored. Leave the email empty to remove the login.",
+        "data": {
+          "app_email": "Anova email",
+          "app_password": "Anova password"
+        }
+      }
+    },
+    "error": {
+      "app_invalid_auth": "Anova rejected the email or password",
+      "app_password_required": "Enter your Anova password",
+      "cannot_connect": "Failed to connect to Anova"
     }
   }
 }

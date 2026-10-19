@@ -13,3 +13,8 @@ send_command:
       required: false
       selector:
         text:
+    use_app_login:
+      required: false
+      default: false
+      selector:
+        boolean:

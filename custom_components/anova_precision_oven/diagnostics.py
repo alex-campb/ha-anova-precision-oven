@@ -6,11 +6,13 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_TOKEN
+from .const import CONF_APP_EMAIL, CONF_APP_REFRESH_TOKEN, CONF_TOKEN
 from .coordinator import AnovaOvenConfigEntry
 
 TO_REDACT = {
     CONF_TOKEN,
+    CONF_APP_REFRESH_TOKEN,
+    CONF_APP_EMAIL,
     "cookerId",
     "userId",
     "deviceId",

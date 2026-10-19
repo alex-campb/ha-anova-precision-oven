@@ -3,6 +3,9 @@
 DOMAIN = "anova_precision_oven"
 
 CONF_TOKEN = "token"
+CONF_APP_EMAIL = "app_email"
+CONF_APP_PASSWORD = "app_password"
+CONF_APP_REFRESH_TOKEN = "app_refresh_token"
 
 ACCESSORIES_APO = "APO"
 

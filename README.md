@@ -75,6 +75,15 @@ The climate entity is intentionally simple.
 
 `turn_off` sends `CMD_APO_STOP`.
 
+## Anova App Login (optional, for the lamp)
+
+Anova refuses the lamp command (`unauthorized`) when it is sent with a Personal Access Token. To control the lamp, open the integration's **Configure** dialog and sign in with your Anova app email and password. The integration then sends lamp commands over a separate connection that authenticates the way the Anova app does. Without the login, the lamp switch behaves as before.
+
+- Only email/password Anova accounts work (not Apple or Google sign-in).
+- The password is not stored; only the sign-in's refresh token is kept.
+- This uses the app's unofficial protocol and may stop working if Anova changes its app. Everything else in the integration is unaffected.
+- To remove the login, open **Configure** and clear the email.
+
 ## Installation
 
 ### HACS

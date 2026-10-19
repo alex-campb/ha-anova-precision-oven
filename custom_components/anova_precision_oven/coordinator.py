@@ -8,6 +8,7 @@ import json
 import logging
 import ssl
 import uuid
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlencode
 
@@ -19,6 +20,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .app_session import AnovaAppSession
 from .const import (
     ACCESSORIES_APO,
     DOMAIN,
@@ -147,6 +149,9 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
         self._pending: dict[str, asyncio.Future] = {}
         self._sent_commands: dict[str, str] = {}
         self.recent_responses: deque[dict[str, Any]] = deque(maxlen=20)
+        # Optional Anova app login (see app_session.py), set up in __init__.py
+        self.app_session: AnovaAppSession | None = None
+        self.on_app_token_refreshed: Callable[[str], None] | None = None
 
         self._log_filter = _TokenRedactFilter(token)
         for name in _INTEGRATION_LOGGER_NAMES:
@@ -441,6 +446,24 @@ class AnovaOvenCoordinator(DataUpdateCoordinator):
             return await asyncio.wait_for(future, timeout)
         finally:
             self._pending.pop(request_id, None)
+
+    async def send_app_command(
+        self, device_id: str, command: str, payload: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Send a command over the Anova app login and return the reply."""
+        if self.app_session is None:
+            raise UpdateFailed("Anova app login is not configured")
+
+        old_token = self.app_session.refresh_token
+        response = await self.app_session.async_send_command(device_id, command, payload)
+        if self.app_session.refresh_token != old_token and self.on_app_token_refreshed:
+            self.on_app_token_refreshed(self.app_session.refresh_token)
+
+        self.recent_responses.append(
+            {"command": command, "via": "app", "response": response}
+        )
+        _LOGGER.debug("App response to %s: %s", command, response.get("payload"))
+        return response
 
     def get_device_state(self, device_id: str) -> dict[str, Any] | None:
         """Get device state by ID."""

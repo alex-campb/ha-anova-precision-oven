@@ -6,6 +6,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CMD_APO_SET_LAMP
@@ -69,20 +70,38 @@ class AnovaOvenLampSwitch(AnovaOvenEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the lamp."""
-        try:
-            await self.coordinator.send_command(
-                self._device_id, CMD_APO_SET_LAMP, {"on": True}
-            )
-            await self.coordinator.async_request_refresh()
-        except Exception as err:
-            _LOGGER.error("Failed to turn on lamp: %s", err)
+        await self._async_set_lamp(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the lamp."""
+        await self._async_set_lamp(False)
+
+    async def _async_set_lamp(self, on: bool) -> None:
+        """Send the lamp command, over the app login when configured.
+
+        A Personal Access Token is refused ("unauthorized") for this
+        command, so the app login is needed for the lamp to respond.
+        """
+        if self.coordinator.app_session is not None:
+            try:
+                response = await self.coordinator.send_app_command(
+                    self._device_id, CMD_APO_SET_LAMP, {"on": on}
+                )
+            except Exception as err:
+                raise HomeAssistantError(f"Failed to set lamp: {err}") from err
+            result = response.get("payload", {})
+            if result.get("status") != "ok":
+                raise HomeAssistantError(
+                    f"Anova refused the lamp command: {result.get('error')}"
+                )
+            return
+
         try:
             await self.coordinator.send_command(
-                self._device_id, CMD_APO_SET_LAMP, {"on": False}
+                self._device_id, CMD_APO_SET_LAMP, {"on": on}
             )
             await self.coordinator.async_request_refresh()
         except Exception as err:
-            _LOGGER.error("Failed to turn off lamp: %s", err)
+            _LOGGER.error(
+                "Failed to turn %s lamp: %s", "on" if on else "off", err
+            )
